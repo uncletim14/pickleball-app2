@@ -7,13 +7,12 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-
 type Participant = {
-  id: number;          // 
+  id: number;
   name: string;
   status: 'confirmed' | 'waitlist';
   day_id: string;
-  people_count: number; // 
+  people_count: number;
   paddle_count: number;
 };
 
