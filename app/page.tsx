@@ -1,4 +1,4 @@
-'use client';
+D'use client';
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
@@ -12,12 +12,11 @@ type Participant = {
   name: string;
   status: 'confirmed' | 'waitlist';
   day_id: string;
-  people_count: number; // 新增：報名人數
-  paddle_count: number; // 新增：球拍數量
+  people_count: number;
+  paddle_count: number;
 };
 
 export default function PickleballRegistration() {
-  // 已經幫您把金額 fee 改成 100 元了！
   const eventDays = [
     { id: 'tue', label: '星期二', time: '19:00 - 21:00', location: '七賢國小', maxPlayers: 10, fee: 100 },
     { id: 'thu', label: '星期四', time: '19:00 - 21:00', location: '七賢國小', maxPlayers: 16, fee: 100 },
@@ -26,8 +25,9 @@ export default function PickleballRegistration() {
 
   const [activeTab, setActiveTab] = useState(eventDays[0].id);
   const [name, setName] = useState('');
-  const [peopleCount, setPeopleCount] = useState(1); // 預設 1 人
-  const [paddleCount, setPaddleCount] = useState(0); // 預設 0 支球拍
+  // 修正：允許狀態暫時是空的字串，解決輸入「12」的問題
+  const [peopleCount, setPeopleCount] = useState<number | ''>(1);
+  const [paddleCount, setPaddleCount] = useState<number | ''>(0);
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -54,27 +54,67 @@ export default function PickleballRegistration() {
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || peopleCount < 1) return;
+    
+    // 如果使用者把格子清空，預設幫他算 1 人 / 0 拍
+    const finalPeopleCount = Number(peopleCount) || 1;
+    const finalPaddleCount = Number(paddleCount) || 0;
 
-    // 計算目前「已經報名成功的總人數」(把每個人的 people_count 加起來)
+    if (!name.trim() || finalPeopleCount < 1) return;
+
+    // 計算目前正取人數與剩餘名額
     const dayParticipants = participants.filter(p => p.day_id === activeTab);
     const confirmedTotalPeople = dayParticipants
       .filter(p => p.status === 'confirmed')
       .reduce((sum, p) => sum + p.people_count, 0);
 
-    // 如果 已經成功的人數 + 這次想報名的人數 超過上限，就整組轉候補
-    const status = (confirmedTotalPeople + peopleCount) <= activeEvent.maxPlayers ? 'confirmed' : 'waitlist';
+    const availableSpots = Math.max(0, activeEvent.maxPlayers - confirmedTotalPeople);
+
+    // 準備要寫入資料庫的資料 (可能是一筆，也可能是被切成兩半的兩筆)
+    let insertData = [];
+
+    if (availableSpots === 0) {
+      // 情況一：名額已滿，全部轉候補
+      insertData.push({
+        name: name,
+        status: 'waitlist',
+        day_id: activeTab,
+        people_count: finalPeopleCount,
+        paddle_count: finalPaddleCount
+      });
+    } else if (finalPeopleCount <= availableSpots) {
+      // 情況二：名額足夠，全部正取
+      insertData.push({
+        name: name,
+        status: 'confirmed',
+        day_id: activeTab,
+        people_count: finalPeopleCount,
+        paddle_count: finalPaddleCount
+      });
+    } else {
+      // 情況三：名額不夠，需要把人切成兩半！(部分正取，部分候補)
+      const waitlistCount = finalPeopleCount - availableSpots;
+      
+      insertData.push({
+        name: name + ' (部分正取)',
+        status: 'confirmed',
+        day_id: activeTab,
+        people_count: availableSpots,
+        paddle_count: finalPaddleCount // 球拍全部掛在正取這筆
+      });
+      
+      insertData.push({
+        name: name + ' (部分候補)',
+        status: 'waitlist',
+        day_id: activeTab,
+        people_count: waitlistCount,
+        paddle_count: 0 // 候補的這筆就不重複算球拍了
+      });
+    }
 
     // 寫入資料庫
     const { data, error } = await supabase
       .from('participants')
-      .insert([{ 
-        name: name, 
-        status: status, 
-        day_id: activeTab,
-        people_count: peopleCount,
-        paddle_count: paddleCount
-      }])
+      .insert(insertData) // 可以一次塞入多筆資料！
       .select();
 
     if (error) {
@@ -83,10 +123,10 @@ export default function PickleballRegistration() {
     }
 
     if (data) {
-      setParticipants([...participants, data[0]]);
+      setParticipants([...participants, ...data]);
       setName('');
-      setPeopleCount(1); // 報名成功後重置回 1 人
-      setPaddleCount(0); // 報名成功後重置回 0 支
+      setPeopleCount(1);
+      setPaddleCount(0);
     }
   };
 
@@ -94,11 +134,12 @@ export default function PickleballRegistration() {
   const confirmedList = currentDayParticipants.filter(p => p.status === 'confirmed');
   const waitlistList = currentDayParticipants.filter(p => p.status === 'waitlist');
   
-  // 計算目前成功總人數（顯示在畫面上）
   const currentConfirmedCount = confirmedList.reduce((sum, p) => sum + p.people_count, 0);
-
-  // 動態計算應繳總金額
-  const totalFee = (activeEvent.fee * peopleCount) + (50 * paddleCount);
+  
+  // 動態計算應繳總金額 (防呆：如果格子空著就當作 1 人 0 拍來算錢)
+  const displayPeople = Number(peopleCount) || 1;
+  const displayPaddle = Number(paddleCount) || 0;
+  const totalFee = (activeEvent.fee * displayPeople) + (50 * displayPaddle);
 
   return (
     <main className="min-h-screen bg-gray-100 p-8 font-sans">
@@ -106,7 +147,6 @@ export default function PickleballRegistration() {
         
         <h1 className="text-3xl font-bold text-gray-800 mb-6 text-center">🏓 七賢國小匹克球交流團</h1>
 
-        {/* 選擇天數 */}
         <div className="flex gap-2 mb-6 border-b border-gray-200 pb-2">
           {eventDays.map((day) => (
             <button
@@ -121,16 +161,14 @@ export default function PickleballRegistration() {
           ))}
         </div>
 
-        {/* 活動資訊 */}
         <div className="bg-blue-50 p-4 rounded-lg mb-6 text-gray-700 space-y-2">
           <p><strong>🕒 時間：</strong> {activeEvent.label} {activeEvent.time}</p>
           <p><strong>📍 地點：</strong> {activeEvent.location}</p>
           <p><strong>💰 場地費：</strong> NT$ {activeEvent.fee} / 人</p>
           <p><strong>🏸 租借球拍：</strong> NT$ 50 / 支</p>
-          <p><strong>👥 剩餘名額：</strong> <span className="text-red-600 font-bold">{Math.max(0, activeEvent.maxPlayers - currentConfirmedCount)} 人</span> (超過上限自動轉候補)</p>
+          <p><strong>👥 剩餘名額：</strong> <span className="text-red-600 font-bold">{Math.max(0, activeEvent.maxPlayers - currentConfirmedCount)} 人</span></p>
         </div>
 
-        {/* 報名表單 */}
         <form onSubmit={handleRegister} className="mb-8 bg-gray-50 p-4 rounded-lg border border-gray-200">
           <div className="flex flex-col gap-4">
             <div>
@@ -151,9 +189,10 @@ export default function PickleballRegistration() {
                 <input
                   type="number"
                   min="1"
-                  value={peopleCount}
-                  onChange={(e) => setPeopleCount(parseInt(e.target.value) || 1)}
+                  value={peopleCount === '' ? '' : peopleCount}
+                  onChange={(e) => setPeopleCount(e.target.value === '' ? '' : parseInt(e.target.value))}
                   className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
+                  placeholder="1"
                 />
               </div>
               <div className="flex-1">
@@ -161,9 +200,10 @@ export default function PickleballRegistration() {
                 <input
                   type="number"
                   min="0"
-                  value={paddleCount}
-                  onChange={(e) => setPaddleCount(parseInt(e.target.value) || 0)}
+                  value={paddleCount === '' ? '' : paddleCount}
+                  onChange={(e) => setPaddleCount(e.target.value === '' ? '' : parseInt(e.target.value))}
                   className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
+                  placeholder="0"
                 />
               </div>
             </div>
@@ -182,12 +222,10 @@ export default function PickleballRegistration() {
           </div>
         </form>
 
-        {/* 名單顯示區域 */}
         {isLoading ? (
           <div className="text-center text-gray-500 py-8">資料同步中，請稍候...</div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* 正取名單 */}
             <div>
               <h2 className="text-xl font-semibold text-green-600 border-b-2 border-green-200 pb-2 mb-3">
                 ✅ 報名成功 ({currentConfirmedCount}/{activeEvent.maxPlayers})
@@ -210,7 +248,6 @@ export default function PickleballRegistration() {
               )}
             </div>
 
-            {/* 候補名單 */}
             <div>
               <h2 className="text-xl font-semibold text-orange-500 border-b-2 border-orange-200 pb-2 mb-3">
                 ⏳ 候補名單
