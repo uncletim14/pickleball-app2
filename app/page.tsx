@@ -23,9 +23,9 @@ type Participant = {
 
 export default function PickleballRegistration() {
   const eventDays = [
-    { id: 'tue', label: '星期二 (3/24)', time: '19:00 - 21:00', location: '七賢國小', maxPlayers: 10, fee: 100 },
-    { id: 'thu', label: '星期四 (3/26)', time: '19:00 - 21:00', location: '七賢國小', maxPlayers: 16, fee: 100 },
-    { id: 'fri', label: '星期五 (3/27)', time: '19:00 - 21:00', location: '七賢國小', maxPlayers: 24, fee: 100 },
+    { id: 'tue', label: '星期二 (3/24)', time: '19:00 - 21:20', location: '七賢國小', maxPlayers: 10, fee: 100 },
+    { id: 'thu', label: '星期四 (3/26)', time: '19:00 - 21:20', location: '七賢國小', maxPlayers: 16, fee: 100 },
+    { id: 'fri', label: '星期五 (3/27)', time: '19:00 - 21:20', location: '七賢國小', maxPlayers: 24, fee: 100 },
   ];
 
   const [activeTab, setActiveTab] = useState(eventDays[0].id);
