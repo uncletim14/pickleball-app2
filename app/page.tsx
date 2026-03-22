@@ -145,8 +145,10 @@ export default function PickleballRegistration() {
   return (
     <main className="min-h-screen bg-gray-100 p-4 md:p-8 font-sans">
       <div className="max-w-2xl mx-auto bg-white rounded-xl shadow-lg p-6">
-        <h1 className="text-2xl md:text-3xl font-bold text-gray-800 mb-6 text-center">🏓 七賢國小匹克球交流團</h1>
-        
+        <h1 className="text-2xl md:text-3xl font-bold text-gray-800 mb-6 flex justify-center items-center gap-3">
+  <img src="/七賢匹克球LOGO.png" alt="Logo" className="w-8 h-8 md:w-10 md:h-10 rounded-full object-cover" />
+  七賢國小匹克球交流團
+</h1>
         <div className="flex gap-2 mb-6 border-b pb-2 overflow-x-auto whitespace-nowrap">
           {eventDays.map((day) => (
             <button
