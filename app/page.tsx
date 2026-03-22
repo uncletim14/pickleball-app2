@@ -6,7 +6,7 @@ import { createClient } from '@supabase/supabase-js';
 // 🛑🛑🛑 系統功能開關 🛑🛑🛑
 // false = 關閉登入功能，大家可以手動輸入姓名 (目前狀態)
 // true  = 開啟登入功能，強制大家必須用 Google 登入才能報名 (測試中先開啟)
-const ENABLE_LOGIN_SYSTEM = true; 
+const ENABLE_LOGIN_SYSTEM = false; 
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
