@@ -54,7 +54,24 @@ export default function PickleballRegistration() {
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+    const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    // --- 新增：限制姓名只能是中文與英文 ---
+    // 這段規則的意思是：只允許 中文 (u4e00-u9fa5) 和 英文大小寫 (a-zA-Z)
+    const nameRegex = /^[a-zA-Z\u4e00-\u9fa5\s]+$/;
+
+    if (!name.trim()) {
+      alert("請輸入姓名！");
+      return;
+    }
+
+    if (!nameRegex.test(name)) {
+      alert("姓名格式錯誤：只能輸入「中文」或「英文」，請勿使用特殊符號或表情符號喔！");
+      return;
+    }
+    // ----------------------------------
+
     // 如果使用者把格子清空，預設幫他算 1 人 / 0 拍
     const finalPeopleCount = Number(peopleCount) || 1;
     const finalPaddleCount = Number(paddleCount) || 0;
