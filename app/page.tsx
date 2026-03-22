@@ -3,6 +3,11 @@
 import { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
+// 🛑🛑🛑 系統功能開關 🛑🛑🛑
+// false = 關閉登入功能，大家可以手動輸入姓名 (目前狀態)
+// true  = 開啟登入功能，強制大家必須用 Google 登入才能報名 (未來狀態)
+const ENABLE_LOGIN_SYSTEM = false; 
+
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
@@ -30,58 +35,47 @@ export default function PickleballRegistration() {
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
-  // --- 新增：用來記住現在是誰登入的狀態 ---
   const [user, setUser] = useState<any>(null);
 
   useEffect(() => {
-    // 1. 檢查目前有沒有人登入
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      if (session?.user?.user_metadata?.full_name) {
-        setName(session.user.user_metadata.full_name); // 自動帶入 Google 姓名
-      }
-    });
+    if (ENABLE_LOGIN_SYSTEM) {
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        setUser(session?.user ?? null);
+        if (session?.user?.user_metadata?.full_name) {
+          setName(session.user.user_metadata.full_name);
+        }
+      });
 
-    // 2. 監聽登入/登出的狀態變化
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-      if (session?.user?.user_metadata?.full_name) {
-        setName(session.user.user_metadata.full_name);
-      } else {
-        setName('');
-      }
-    });
-
-    fetchParticipants();
-
-    return () => subscription.unsubscribe();
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+        setUser(session?.user ?? null);
+        if (session?.user?.user_metadata?.full_name) {
+          setName(session.user.user_metadata.full_name);
+        } else {
+          setName('');
+        }
+      });
+      fetchParticipants();
+      return () => subscription.unsubscribe();
+    } else {
+      fetchParticipants();
+    }
   }, []);
 
   const fetchParticipants = async () => {
     setIsLoading(true);
-    const { data, error } = await supabase
-      .from('participants')
-      .select('*')
-      .order('id', { ascending: true });
-
-    if (!error && data) {
-      setParticipants(data);
-    }
+    const { data, error } = await supabase.from('participants').select('*').order('id', { ascending: true });
+    if (!error && data) setParticipants(data);
     setIsLoading(false);
   };
 
-  // --- 新增：Google 登入與登出功能 ---
   const handleGoogleLogin = async () => {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-    });
+    const { error } = await supabase.auth.signInWithOAuth({ provider: 'google' });
     if (error) alert("登入失敗：" + error.message);
   };
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
   };
-  // ---------------------------------
 
   const activeEvent = eventDays.find(d => d.id === activeTab)!;
 
@@ -89,8 +83,17 @@ export default function PickleballRegistration() {
     e.preventDefault();
 
     if (!name.trim()) {
-      alert("姓名讀取失敗，請重新登入！");
+      alert(ENABLE_LOGIN_SYSTEM ? "姓名讀取失敗，請重新登入！" : "請輸入姓名！");
       return;
+    }
+
+    // 免登入模式下，重新啟動中英文檢查防呆
+    if (!ENABLE_LOGIN_SYSTEM) {
+      const nameRegex = /^[a-zA-Z\u4e00-\u9fa5\s]+$/;
+      if (!nameRegex.test(name)) {
+        alert("姓名格式錯誤：只能輸入「中文」或「英文」，請勿使用特殊符號！");
+        return;
+      }
     }
 
     const finalPeople = Number(peopleCount) || 1;
@@ -100,10 +103,7 @@ export default function PickleballRegistration() {
     if (!window.confirm(confirmMessage)) return;
 
     const dayParticipants = participants.filter(p => p.day_id === activeTab);
-    const confirmedTotal = dayParticipants
-      .filter(p => p.status === 'confirmed')
-      .reduce((sum, p) => sum + p.people_count, 0);
-
+    const confirmedTotal = dayParticipants.filter(p => p.status === 'confirmed').reduce((sum, p) => sum + p.people_count, 0);
     const availableSpots = Math.max(0, activeEvent.maxPlayers - confirmedTotal);
     let insertData = [];
 
@@ -121,6 +121,7 @@ export default function PickleballRegistration() {
 
     if (!error && data) {
       setParticipants([...participants, ...data]);
+      if (!ENABLE_LOGIN_SYSTEM) setName(''); // 沒登入狀態下送出後清空姓名
       setPeopleCount(1);
       setPaddleCount(0);
       alert("報名完成！");
@@ -158,64 +159,40 @@ export default function PickleballRegistration() {
           <p><strong>👥 剩餘正取：</strong> <span className="text-red-600 font-bold">{Math.max(0, activeEvent.maxPlayers - totalConfirmed)} 人</span></p>
         </div>
 
-        {/* --- 判斷：如果有登入，顯示報名表；如果沒登入，顯示登入按鈕 --- */}
-        {!user ? (
-          <div className="mb-8 p-8 bg-gray-50 rounded-lg border text-center">
-            <p className="text-gray-600 mb-4 font-medium">請先登入，系統將自動帶入您的真實姓名。</p>
-            <button 
-              onClick={handleGoogleLogin} 
-              className="bg-white border border-gray-300 text-gray-700 font-bold py-3 px-6 rounded-lg hover:bg-gray-100 transition shadow-sm flex items-center justify-center mx-auto gap-3"
-            >
-              <span className="text-xl">🌐</span> 使用 Google 帳號登入
-            </button>
-          </div>
-        ) : (
-          <form onSubmit={handleRegister} className="mb-8 space-y-4 bg-gray-50 p-4 rounded-lg border">
-            <div className="flex justify-between items-center mb-2">
-              <span className="text-sm text-green-600 font-bold flex items-center gap-1">
-                ✅ 已登入身分
-              </span>
-              <button type="button" onClick={handleLogout} className="text-xs text-red-500 hover:underline">
-                登出帳號
+        {/* --- 這裡會根據開關狀態，自動決定顯示哪一種報名表 --- */}
+        {ENABLE_LOGIN_SYSTEM ? (
+          !user ? (
+            <div className="mb-8 p-8 bg-gray-50 rounded-lg border text-center">
+              <p className="text-gray-600 mb-4 font-medium">請先登入，系統將自動帶入您的真實姓名。</p>
+              <button onClick={handleGoogleLogin} className="bg-white border border-gray-300 text-gray-700 font-bold py-3 px-6 rounded-lg hover:bg-gray-100 transition shadow-sm flex items-center justify-center mx-auto gap-3">
+                <span className="text-xl">🌐</span> 使用 Google 帳號登入
               </button>
             </div>
-            
-            <input
-              type="text"
-              value={name}
-              readOnly
-              className="w-full border rounded-lg px-4 py-2 bg-gray-200 text-gray-600 cursor-not-allowed"
-              title="已自動帶入 Google 姓名，無法修改"
-            />
-            
+          ) : (
+            <form onSubmit={handleRegister} className="mb-8 space-y-4 bg-gray-50 p-4 rounded-lg border">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-sm text-green-600 font-bold flex items-center gap-1">✅ 已登入身分</span>
+                <button type="button" onClick={handleLogout} className="text-xs text-red-500 hover:underline">登出帳號</button>
+              </div>
+              <input type="text" value={name} readOnly className="w-full border rounded-lg px-4 py-2 bg-gray-200 text-gray-600 cursor-not-allowed" title="已自動帶入 Google 姓名，無法修改" />
+              <div className="flex gap-4">
+                <div className="flex-1"><label className="text-xs text-gray-500 ml-1">報名人數</label><input type="number" min="1" value={peopleCount === '' ? '' : peopleCount} onChange={(e) => setPeopleCount(e.target.value === '' ? '' : parseInt(e.target.value))} className="w-full border rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-blue-500" /></div>
+                <div className="flex-1"><label className="text-xs text-gray-500 ml-1">租借球拍</label><input type="number" min="0" value={paddleCount === '' ? '' : paddleCount} onChange={(e) => setPaddleCount(e.target.value === '' ? '' : parseInt(e.target.value))} className="w-full border rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-blue-500" /></div>
+              </div>
+              <button type="submit" className="w-full bg-blue-600 text-white font-bold py-3 rounded-lg hover:bg-blue-700 transition shadow-md">送出報名</button>
+            </form>
+          )
+        ) : (
+          <form onSubmit={handleRegister} className="mb-8 space-y-4 bg-gray-50 p-4 rounded-lg border">
+            <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="報名姓名 (限中英文)" className="w-full border rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-blue-500" required />
             <div className="flex gap-4">
-              <div className="flex-1">
-                <label className="text-xs text-gray-500 ml-1">報名人數</label>
-                <input
-                  type="number"
-                  min="1"
-                  value={peopleCount === '' ? '' : peopleCount}
-                  onChange={(e) => setPeopleCount(e.target.value === '' ? '' : parseInt(e.target.value))}
-                  className="w-full border rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              <div className="flex-1">
-                <label className="text-xs text-gray-500 ml-1">租借球拍</label>
-                <input
-                  type="number"
-                  min="0"
-                  value={paddleCount === '' ? '' : paddleCount}
-                  onChange={(e) => setPaddleCount(e.target.value === '' ? '' : parseInt(e.target.value))}
-                  className="w-full border rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
+              <div className="flex-1"><label className="text-xs text-gray-500 ml-1">報名人數</label><input type="number" min="1" value={peopleCount === '' ? '' : peopleCount} onChange={(e) => setPeopleCount(e.target.value === '' ? '' : parseInt(e.target.value))} className="w-full border rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-blue-500" /></div>
+              <div className="flex-1"><label className="text-xs text-gray-500 ml-1">租借球拍</label><input type="number" min="0" value={paddleCount === '' ? '' : paddleCount} onChange={(e) => setPaddleCount(e.target.value === '' ? '' : parseInt(e.target.value))} className="w-full border rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-blue-500" /></div>
             </div>
-            <button type="submit" className="w-full bg-blue-600 text-white font-bold py-3 rounded-lg hover:bg-blue-700 transition shadow-md">
-              送出報名
-            </button>
+            <button type="submit" className="w-full bg-blue-600 text-white font-bold py-3 rounded-lg hover:bg-blue-700 transition shadow-md">送出報名</button>
           </form>
         )}
-        {/* -------------------------------------------------------- */}
+        {/* ---------------------------------------------------------------- */}
 
         {isLoading ? (
           <div className="text-center py-10 text-gray-400">連線資料庫中...</div>
