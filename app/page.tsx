@@ -161,7 +161,7 @@ export default function PickleballRegistration() {
           ))}
         </div>
 
-       <div className="bg-blue-50 p-4 rounded-lg mb-6 text-blue-900 space-y-1 text-sm md:text-base">
+       <div className="bg-blue-50 p-4 rounded-lg mb-6 text-green-700 space-y-1 text-sm md:text-base">
   <p><strong>🕒 時間：</strong> {activeEvent.label} {activeEvent.time}</p>
   <p><strong>📍 地點：</strong> {activeEvent.location}</p>
   <p><strong>💰 費用：</strong> {activeEvent.fee} / 人 (租借球拍 +50)</p>
