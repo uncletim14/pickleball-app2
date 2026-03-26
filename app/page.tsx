@@ -20,12 +20,12 @@ type Participant = {
 };
 
 export default function PickleballRegistration() {
-  // 🌟 更新：新增了 4/2 的新手體驗場，名額設定為 8 人
+  // 🌟 更新：4/2 新手體驗場的 fee (費用) 改為 0
   const eventDays = [
     { id: 'tue', label: '星期二 (3/24)', time: '19:00 - 21:00', location: '七賢國小', maxPlayers: 10, fee: 100 },
     { id: 'thu', label: '星期四 (3/26)', time: '19:00 - 21:00', location: '七賢國小', maxPlayers: 16, fee: 100 },
     { id: 'fri', label: '星期五 (3/27)', time: '19:00 - 21:00', location: '七賢國小', maxPlayers: 24, fee: 100 },
-    { id: 'novice_0402', label: '新手體驗 (4/2)', time: '19:00 - 21:00', location: '七賢國小', maxPlayers: 8, fee: 免費 },
+    { id: 'novice_0402', label: '新手體驗 (4/2)', time: '19:00 - 21:00', location: '七賢國小', maxPlayers: 8, fee: 0 },
   ];
 
   const [activeTab, setActiveTab] = useState(eventDays[0].id);
@@ -86,8 +86,6 @@ export default function PickleballRegistration() {
       alert("請輸入 LINE 群組暱稱或 ID！");
       return;
     }
-
-    // 💡 已經幫您移除了「純中英文」的嚴格限制，現在可以自由輸入包含數字的 LINE ID 了！
 
     const finalPeople = Number(peopleCount) || 1;
     const finalPaddle = Number(paddleCount) || 0;
@@ -155,7 +153,15 @@ export default function PickleballRegistration() {
         <div className="bg-blue-50 p-4 rounded-lg mb-6 text-blue-700 space-y-1 text-sm md:text-base">
           <p><strong>🕒 時間：</strong> {activeEvent.label} {activeEvent.time}</p>
           <p><strong>📍 地點：</strong> {activeEvent.location}</p>
-          <p><strong>💰 費用：</strong> {activeEvent.fee} / 人 (租借球拍 +50)</p>
+          {/* 🌟 更新：聰明的費用顯示魔法！ */}
+          <p><strong>💰 費用：</strong> 
+            {activeEvent.fee === 0 ? (
+              <span className="text-green-600 font-bold">免費</span>
+            ) : (
+              `${activeEvent.fee} / 人`
+            )} 
+            {' '}(租借球拍 +50)
+          </p>
           <p><strong>👥 剩餘正取：</strong> <span className="text-red-600 font-bold">{Math.max(0, activeEvent.maxPlayers - totalConfirmed)} 人</span></p>
         </div>
 
@@ -183,7 +189,6 @@ export default function PickleballRegistration() {
           )
         ) : (
           <form onSubmit={handleRegister} className="mb-8 space-y-4 bg-gray-50 p-4 rounded-lg border">
-            {/* 🌟 更新：更改了 placeholder 提示文字 */}
             <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="請輸入 LINE 群組暱稱或 ID" className="w-full border rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-blue-500" required />
             <div className="flex gap-4">
               <div className="flex-1"><label className="text-xs text-gray-500 ml-1">報名人數</label><input type="number" min="1" value={peopleCount === '' ? '' : peopleCount} onChange={(e) => setPeopleCount(e.target.value === '' ? '' : parseInt(e.target.value))} className="w-full border rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-blue-500" /></div>
