@@ -20,7 +20,6 @@ type Participant = {
 };
 
 export default function PickleballRegistration() {
-  // 🌟 更新：4/2 新手體驗場的 fee (費用) 改為 0
   const eventDays = [
     { id: 'tue', label: '星期二 (3/24)', time: '19:00 - 21:00', location: '七賢國小', maxPlayers: 10, fee: 100 },
     { id: 'thu', label: '星期四 (3/26)', time: '19:00 - 21:00', location: '七賢國小', maxPlayers: 16, fee: 100 },
@@ -88,9 +87,10 @@ export default function PickleballRegistration() {
     }
 
     const finalPeople = Number(peopleCount) || 1;
-    const finalPaddle = Number(paddleCount) || 0;
+    // 如果是新手體驗場，強制將租借球拍數量設為 0
+    const finalPaddle = activeEvent.fee === 0 ? 0 : (Number(paddleCount) || 0);
 
-    const confirmMessage = `📌 請確認報名資訊：\n\n📅 日期：${activeEvent.label}\n👥 人數：${finalPeople} 人\n🏸 球拍：${finalPaddle} 支\n\n確定要送出嗎？`;
+    const confirmMessage = `📌 請確認報名資訊：\n\n📅 日期：${activeEvent.label}\n👥 人數：${finalPeople} 人${activeEvent.fee !== 0 ? `\n🏸 球拍：${finalPaddle} 支` : ''}\n\n確定要送出嗎？`;
     if (!window.confirm(confirmMessage)) return;
 
     const dayParticipants = participants.filter(p => p.day_id === activeTab);
@@ -153,14 +153,13 @@ export default function PickleballRegistration() {
         <div className="bg-blue-50 p-4 rounded-lg mb-6 text-blue-700 space-y-1 text-sm md:text-base">
           <p><strong>🕒 時間：</strong> {activeEvent.label} {activeEvent.time}</p>
           <p><strong>📍 地點：</strong> {activeEvent.location}</p>
-          {/* 🌟 更新：聰明的費用顯示魔法！ */}
+          {/* 🌟 更新：免費時隱藏租借球拍的備註文字 */}
           <p><strong>💰 費用：</strong> 
             {activeEvent.fee === 0 ? (
               <span className="text-green-600 font-bold">免費</span>
             ) : (
-              `${activeEvent.fee} / 人`
+              `${activeEvent.fee} / 人 (租借球拍 +50)`
             )} 
-            {' '}(租借球拍 +50)
           </p>
           <p><strong>👥 剩餘正取：</strong> <span className="text-red-600 font-bold">{Math.max(0, activeEvent.maxPlayers - totalConfirmed)} 人</span></p>
         </div>
@@ -182,7 +181,10 @@ export default function PickleballRegistration() {
               <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="請輸入 LINE 群組暱稱或 ID" className="w-full border rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-blue-500 bg-white" required />
               <div className="flex gap-4">
                 <div className="flex-1"><label className="text-xs text-gray-500 ml-1">報名人數</label><input type="number" min="1" value={peopleCount === '' ? '' : peopleCount} onChange={(e) => setPeopleCount(e.target.value === '' ? '' : parseInt(e.target.value))} className="w-full border rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-blue-500" /></div>
-                <div className="flex-1"><label className="text-xs text-gray-500 ml-1">租借球拍</label><input type="number" min="0" value={paddleCount === '' ? '' : paddleCount} onChange={(e) => setPaddleCount(e.target.value === '' ? '' : parseInt(e.target.value))} className="w-full border rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-blue-500" /></div>
+                {/* 🌟 更新：如果是免費活動，就隱藏這個租借球拍的欄位 */}
+                {activeEvent.fee !== 0 && (
+                  <div className="flex-1"><label className="text-xs text-gray-500 ml-1">租借球拍</label><input type="number" min="0" value={paddleCount === '' ? '' : paddleCount} onChange={(e) => setPaddleCount(e.target.value === '' ? '' : parseInt(e.target.value))} className="w-full border rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-blue-500" /></div>
+                )}
               </div>
               <button type="submit" className="w-full bg-blue-600 text-white font-bold py-3 rounded-lg hover:bg-blue-700 transition shadow-md">送出報名</button>
             </form>
@@ -192,7 +194,10 @@ export default function PickleballRegistration() {
             <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="請輸入 LINE 群組暱稱或 ID" className="w-full border rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-blue-500" required />
             <div className="flex gap-4">
               <div className="flex-1"><label className="text-xs text-gray-500 ml-1">報名人數</label><input type="number" min="1" value={peopleCount === '' ? '' : peopleCount} onChange={(e) => setPeopleCount(e.target.value === '' ? '' : parseInt(e.target.value))} className="w-full border rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-blue-500" /></div>
-              <div className="flex-1"><label className="text-xs text-gray-500 ml-1">租借球拍</label><input type="number" min="0" value={paddleCount === '' ? '' : paddleCount} onChange={(e) => setPaddleCount(e.target.value === '' ? '' : parseInt(e.target.value))} className="w-full border rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-blue-500" /></div>
+              {/* 🌟 更新：如果是免費活動，就隱藏這個租借球拍的欄位 */}
+              {activeEvent.fee !== 0 && (
+                <div className="flex-1"><label className="text-xs text-gray-500 ml-1">租借球拍</label><input type="number" min="0" value={paddleCount === '' ? '' : paddleCount} onChange={(e) => setPaddleCount(e.target.value === '' ? '' : parseInt(e.target.value))} className="w-full border rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-blue-500" /></div>
+              )}
             </div>
             <button type="submit" className="w-full bg-blue-600 text-white font-bold py-3 rounded-lg hover:bg-blue-700 transition shadow-md">送出報名</button>
           </form>
