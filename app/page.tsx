@@ -20,11 +20,13 @@ type Participant = {
 };
 
 export default function PickleballRegistration() {
+  // 🌟 魔法時間：我在新手體驗場的前面加上了「//」，這會讓它暫時隱形！
+  // 等您下週要開放時，只要把這兩個斜線刪掉，它就會瞬間復活！
   const eventDays = [
     { id: 'tue', label: '星期二 (3/24)', time: '19:00 - 21:00', location: '七賢國小', maxPlayers: 10, fee: 100 },
     { id: 'thu', label: '星期四 (3/26)', time: '19:00 - 21:00', location: '七賢國小', maxPlayers: 16, fee: 100 },
     { id: 'fri', label: '星期五 (3/27)', time: '19:00 - 21:00', location: '七賢國小', maxPlayers: 24, fee: 100 },
-    { id: 'novice_0402', label: '新手體驗 (4/2)', time: '19:00 - 21:00', location: '七賢國小', maxPlayers: 8, fee: 0 },
+    // { id: 'novice_0402', label: '新手體驗 (4/2)', time: '19:00 - 21:00', location: '七賢國小', maxPlayers: 8, fee: 0 },
   ];
 
   const [activeTab, setActiveTab] = useState(eventDays[0].id);
@@ -134,6 +136,7 @@ export default function PickleballRegistration() {
     <main className="min-h-screen bg-gray-100 p-4 md:p-8 font-sans">
       <div className="max-w-2xl mx-auto bg-white rounded-xl shadow-lg p-6">
         <h1 className="text-2xl md:text-3xl font-bold text-gray-800 mb-6 flex justify-center items-center gap-3">
+          {/* 🔍 記得確認這裡的檔名大小寫與副檔名喔！ */}
           <img src="/七賢匹克球LOGO.png" alt="Logo" className="w-16 h-16 md:w-20 md:h-20 rounded-full object-cover" />
           七賢國小匹克球交流團
         </h1>
@@ -153,7 +156,6 @@ export default function PickleballRegistration() {
         <div className="bg-blue-50 p-4 rounded-lg mb-6 text-blue-700 space-y-1 text-sm md:text-base">
           <p><strong>🕒 時間：</strong> {activeEvent.label} {activeEvent.time}</p>
           <p><strong>📍 地點：</strong> {activeEvent.location}</p>
-          {/* 🌟 更新：免費時隱藏租借球拍的備註文字 */}
           <p><strong>💰 費用：</strong> 
             {activeEvent.fee === 0 ? (
               <span className="text-green-600 font-bold">免費</span>
@@ -181,7 +183,6 @@ export default function PickleballRegistration() {
               <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="請輸入 LINE 群組暱稱或 ID" className="w-full border rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-blue-500 bg-white" required />
               <div className="flex gap-4">
                 <div className="flex-1"><label className="text-xs text-gray-500 ml-1">報名人數</label><input type="number" min="1" value={peopleCount === '' ? '' : peopleCount} onChange={(e) => setPeopleCount(e.target.value === '' ? '' : parseInt(e.target.value))} className="w-full border rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-blue-500" /></div>
-                {/* 🌟 更新：如果是免費活動，就隱藏這個租借球拍的欄位 */}
                 {activeEvent.fee !== 0 && (
                   <div className="flex-1"><label className="text-xs text-gray-500 ml-1">租借球拍</label><input type="number" min="0" value={paddleCount === '' ? '' : paddleCount} onChange={(e) => setPaddleCount(e.target.value === '' ? '' : parseInt(e.target.value))} className="w-full border rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-blue-500" /></div>
                 )}
@@ -194,7 +195,6 @@ export default function PickleballRegistration() {
             <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="請輸入 LINE 群組暱稱或 ID" className="w-full border rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-blue-500" required />
             <div className="flex gap-4">
               <div className="flex-1"><label className="text-xs text-gray-500 ml-1">報名人數</label><input type="number" min="1" value={peopleCount === '' ? '' : peopleCount} onChange={(e) => setPeopleCount(e.target.value === '' ? '' : parseInt(e.target.value))} className="w-full border rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-blue-500" /></div>
-              {/* 🌟 更新：如果是免費活動，就隱藏這個租借球拍的欄位 */}
               {activeEvent.fee !== 0 && (
                 <div className="flex-1"><label className="text-xs text-gray-500 ml-1">租借球拍</label><input type="number" min="0" value={paddleCount === '' ? '' : paddleCount} onChange={(e) => setPaddleCount(e.target.value === '' ? '' : parseInt(e.target.value))} className="w-full border rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-blue-500" /></div>
               )}
