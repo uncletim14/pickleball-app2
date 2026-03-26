@@ -25,7 +25,7 @@ export default function PickleballRegistration() {
     { id: 'tue', label: '星期二 (3/24)', time: '19:00 - 21:00', location: '七賢國小', maxPlayers: 10, fee: 100 },
     { id: 'thu', label: '星期四 (3/26)', time: '19:00 - 21:00', location: '七賢國小', maxPlayers: 16, fee: 100 },
     { id: 'fri', label: '星期五 (3/27)', time: '19:00 - 21:00', location: '七賢國小', maxPlayers: 24, fee: 100 },
-    { id: 'novice_0402', label: '新手體驗 (4/2)', time: '19:00 - 21:00', location: '七賢國小', maxPlayers: 8, fee: 100 },
+    { id: 'novice_0402', label: '新手體驗 (4/2)', time: '19:00 - 21:00', location: '七賢國小', maxPlayers: 8, fee: 免費 },
   ];
 
   const [activeTab, setActiveTab] = useState(eventDays[0].id);
