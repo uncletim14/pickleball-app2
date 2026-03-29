@@ -139,7 +139,7 @@ export default function PickleballRegistration() {
     <main className="min-h-screen bg-gray-100 p-4 md:p-8 font-sans">
       <div className="max-w-2xl mx-auto bg-white rounded-xl shadow-lg p-6">
         <h1 className="text-2xl md:text-3xl font-bold text-gray-800 mb-6 flex justify-center items-center gap-3">
-          <img src="/logo.png" alt="Logo" className="w-16 h-16 md:w-20 md:h-20 rounded-full object-cover" />
+          <img src="/七賢匹克球LOGO.pngclassName="w-16 h-16 md:w-20 md:h-20 rounded-full object-cover" />
           七賢國小匹克球交流團
         </h1>
         
