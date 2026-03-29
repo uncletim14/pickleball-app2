@@ -6,6 +6,11 @@ import { createClient } from '@supabase/supabase-js';
 // 🛑🛑🛑 系統功能開關 🛑🛑🛑
 const ENABLE_LOGIN_SYSTEM = false; 
 
+// 🌟 新增：報名開放總開關
+// false = 關閉報名表，顯示「星期日晚上18:00開放」的公告
+// true  = 正常開放報名
+const IS_REGISTRATION_OPEN = false; 
+
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
@@ -20,8 +25,7 @@ type Participant = {
 };
 
 export default function PickleballRegistration() {
-  // 🌟 魔法時間：我在新手體驗場的前面加上了「//」，這會讓它暫時隱形！
-  // 等您下週要開放時，只要把這兩個斜線刪掉，它就會瞬間復活！
+  // 新手體驗場暫時隱藏中
   const eventDays = [
     { id: 'tue', label: '星期二 (3/24)', time: '19:00 - 21:00', location: '七賢國小', maxPlayers: 10, fee: 100 },
     { id: 'thu', label: '星期四 (3/26)', time: '19:00 - 21:00', location: '七賢國小', maxPlayers: 16, fee: 100 },
@@ -89,7 +93,6 @@ export default function PickleballRegistration() {
     }
 
     const finalPeople = Number(peopleCount) || 1;
-    // 如果是新手體驗場，強制將租借球拍數量設為 0
     const finalPaddle = activeEvent.fee === 0 ? 0 : (Number(paddleCount) || 0);
 
     const confirmMessage = `📌 請確認報名資訊：\n\n📅 日期：${activeEvent.label}\n👥 人數：${finalPeople} 人${activeEvent.fee !== 0 ? `\n🏸 球拍：${finalPaddle} 支` : ''}\n\n確定要送出嗎？`;
@@ -136,8 +139,7 @@ export default function PickleballRegistration() {
     <main className="min-h-screen bg-gray-100 p-4 md:p-8 font-sans">
       <div className="max-w-2xl mx-auto bg-white rounded-xl shadow-lg p-6">
         <h1 className="text-2xl md:text-3xl font-bold text-gray-800 mb-6 flex justify-center items-center gap-3">
-          {/* 🔍 記得確認這裡的檔名大小寫與副檔名喔！ */}
-          <img src="/七賢匹克球LOGO.png" alt="Logo" className="w-16 h-16 md:w-20 md:h-20 rounded-full object-cover" />
+          <img src="/logo.png" alt="Logo" className="w-16 h-16 md:w-20 md:h-20 rounded-full object-cover" />
           七賢國小匹克球交流團
         </h1>
         
@@ -166,7 +168,14 @@ export default function PickleballRegistration() {
           <p><strong>👥 剩餘正取：</strong> <span className="text-red-600 font-bold">{Math.max(0, activeEvent.maxPlayers - totalConfirmed)} 人</span></p>
         </div>
 
-        {ENABLE_LOGIN_SYSTEM ? (
+        {/* 🌟 核心魔法：根據 IS_REGISTRATION_OPEN 開關決定要顯示什麼 */}
+        {!IS_REGISTRATION_OPEN ? (
+          <div className="mb-8 p-8 bg-yellow-50 rounded-lg border border-yellow-200 text-center shadow-sm">
+            <div className="text-5xl mb-4">⏳</div>
+            <h2 className="text-xl font-bold text-yellow-800 mb-2">目前暫停報名</h2>
+            <p className="text-yellow-700 font-medium">下週場次將於 <strong>星期日晚上 18:00</strong> 準時開放，<br/>請球友們留意時間喔！</p>
+          </div>
+        ) : ENABLE_LOGIN_SYSTEM ? (
           !user ? (
             <div className="mb-8 p-8 bg-gray-50 rounded-lg border text-center">
               <p className="text-gray-600 mb-4 font-medium">請先登入，以確認您的報名身分。</p>
