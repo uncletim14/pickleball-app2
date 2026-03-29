@@ -6,7 +6,7 @@ import { createClient } from '@supabase/supabase-js';
 // 🛑🛑🛑 系統功能開關 🛑🛑🛑
 const ENABLE_LOGIN_SYSTEM = false; 
 
-// 🌟 新增：報名開放總開關
+// 🌟 報名開放總開關
 // false = 關閉報名表，顯示「星期日晚上18:00開放」的公告
 // true  = 正常開放報名
 const IS_REGISTRATION_OPEN = false; 
@@ -25,12 +25,12 @@ type Participant = {
 };
 
 export default function PickleballRegistration() {
-  // 新手體驗場暫時隱藏中
+  // 🌟 更新：新手體驗場的隱形斗篷已經拿掉囉！正式加入列表！
   const eventDays = [
-    { id: 'tue', label: '星期二 (3/24)', time: '19:00 - 21:00', location: '七賢國小', maxPlayers: 10, fee: 100 },
-    { id: 'thu', label: '星期四 (3/26)', time: '19:00 - 21:00', location: '七賢國小', maxPlayers: 16, fee: 100 },
-    { id: 'fri', label: '星期五 (3/27)', time: '19:00 - 21:00', location: '七賢國小', maxPlayers: 24, fee: 100 },
-    // { id: 'novice_0402', label: '新手體驗 (4/2)', time: '19:00 - 21:00', location: '七賢國小', maxPlayers: 8, fee: 0 },
+    { id: 'tue', label: '星期二 (3/31)', time: '19:00 - 21:20', location: '七賢國小', maxPlayers: 10, fee: 100 },
+    { id: 'thu', label: '星期四 (4/02)', time: '19:00 - 21:20', location: '七賢國小', maxPlayers: 16, fee: 100 },
+    { id: 'fri', label: '星期五 (4/03)', time: '19:00 - 21:20', location: '七賢國小', maxPlayers: 24, fee: 100 },
+    { id: 'novice_0402', label: '新手體驗 (4/2)', time: '19:00 - 21:20', location: '七賢國小', maxPlayers: 8, fee: 0 },
   ];
 
   const [activeTab, setActiveTab] = useState(eventDays[0].id);
@@ -168,7 +168,6 @@ export default function PickleballRegistration() {
           <p><strong>👥 剩餘正取：</strong> <span className="text-red-600 font-bold">{Math.max(0, activeEvent.maxPlayers - totalConfirmed)} 人</span></p>
         </div>
 
-        {/* 🌟 核心魔法：根據 IS_REGISTRATION_OPEN 開關決定要顯示什麼 */}
         {!IS_REGISTRATION_OPEN ? (
           <div className="mb-8 p-8 bg-yellow-50 rounded-lg border border-yellow-200 text-center shadow-sm">
             <div className="text-5xl mb-4">⏳</div>
