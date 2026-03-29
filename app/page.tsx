@@ -25,7 +25,6 @@ type Participant = {
 };
 
 export default function PickleballRegistration() {
-  // 🌟 更新：新手體驗場的隱形斗篷已經拿掉囉！正式加入列表！
   const eventDays = [
     { id: 'tue', label: '星期二 (3/31)', time: '19:00 - 21:20', location: '七賢國小', maxPlayers: 10, fee: 100 },
     { id: 'thu', label: '星期四 (4/02)', time: '19:00 - 21:20', location: '七賢國小', maxPlayers: 16, fee: 100 },
@@ -139,7 +138,8 @@ export default function PickleballRegistration() {
     <main className="min-h-screen bg-gray-100 p-4 md:p-8 font-sans">
       <div className="max-w-2xl mx-auto bg-white rounded-xl shadow-lg p-6">
         <h1 className="text-2xl md:text-3xl font-bold text-gray-800 mb-6 flex justify-center items-center gap-3">
-          <img src="/七賢匹克球LOGO.pngclassName="w-16 h-16 md:w-20 md:h-20 rounded-full object-cover" />
+          {/* 🌟 更新：這裡把檔名精準設定為您的 七賢匹克球LOGO.png */}
+          <img src="/七賢匹克球LOGO.png" alt="Logo" className="w-16 h-16 md:w-20 md:h-20 rounded-full object-cover" />
           七賢國小匹克球交流團
         </h1>
         
