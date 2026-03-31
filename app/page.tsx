@@ -7,8 +7,6 @@ import { createClient } from '@supabase/supabase-js';
 const ENABLE_LOGIN_SYSTEM = false; 
 
 // 🌟 報名開放總開關
-// false = 關閉報名表，顯示「星期日晚上18:00開放」的公告
-// true  = 正常開放報名
 const IS_REGISTRATION_OPEN = false; 
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -99,10 +97,15 @@ export default function PickleballRegistration() {
 
     const dayParticipants = participants.filter(p => p.day_id === activeTab);
     const confirmedTotal = dayParticipants.filter(p => p.status === 'confirmed').reduce((sum, p) => sum + p.people_count, 0);
+    
+    // 🌟 新增：計算目前候補名單上有幾個人
+    const waitlistCount = dayParticipants.filter(p => p.status === 'waitlist').length;
+    
     const availableSpots = Math.max(0, activeEvent.maxPlayers - confirmedTotal);
     let insertData = [];
 
-    if (availableSpots === 0) {
+    // 🌟 核心修正：如果名額滿了，【或者】候補區已經有人了，新來的就一律去候補！
+    if (availableSpots === 0 || waitlistCount > 0) {
       insertData.push({ name, status: 'waitlist', day_id: activeTab, people_count: finalPeople, paddle_count: finalPaddle });
     } else if (finalPeople <= availableSpots) {
       insertData.push({ name, status: 'confirmed', day_id: activeTab, people_count: finalPeople, paddle_count: finalPaddle });
@@ -138,7 +141,6 @@ export default function PickleballRegistration() {
     <main className="min-h-screen bg-gray-100 p-4 md:p-8 font-sans">
       <div className="max-w-2xl mx-auto bg-white rounded-xl shadow-lg p-6">
         <h1 className="text-2xl md:text-3xl font-bold text-gray-800 mb-6 flex justify-center items-center gap-3">
-          {/* 🌟 更新：這裡把檔名精準設定為您的 七賢匹克球LOGO.png */}
           <img src="/七賢匹克球LOGO.png" alt="Logo" className="w-16 h-16 md:w-20 md:h-20 rounded-full object-cover" />
           七賢國小匹克球交流團
         </h1>
