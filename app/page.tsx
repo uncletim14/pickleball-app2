@@ -7,9 +7,9 @@ import { createClient } from '@supabase/supabase-js';
 const ENABLE_LOGIN_SYSTEM = false; 
 
 // 🌟 報名開放總開關
-// false = 關閉報名表，顯示「星期日晚上18:00開放」的公告
+// false = 關閉報名表，顯示「休息中」公告
 // true  = 正常開放報名
-const IS_REGISTRATION_OPEN = false;
+const IS_REGISTRATION_OPEN = false; 
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -25,11 +25,12 @@ type Participant = {
 };
 
 export default function PickleballRegistration() {
+  // 🌟 更新：修正了 4/7, 4/9, 4/10 的日期，且星期四加開至 24 人
   const eventDays = [
-    { id: 'tue', label: '星期二 (3/31)', time: '19:00 - 21:20', location: '七賢國小', maxPlayers: 10, fee: 100 },
-    { id: 'thu', label: '星期四 (4/02)', time: '19:00 - 21:20', location: '七賢國小', maxPlayers: 16, fee: 100 },
-    { id: 'fri', label: '星期五 (4/03)', time: '19:00 - 21:20', location: '七賢國小', maxPlayers: 24, fee: 100 },
-    { id: 'novice_0402', label: '新手體驗 (4/2)', time: '19:00 - 21:20', location: '七賢國小', maxPlayers: 8, fee: 0 },
+    { id: 'tue_0407', label: '星期二 (4/7)', time: '19:00 - 21:20', location: '七賢國小', maxPlayers: 10, fee: 100 },
+    { id: 'thu_0409', label: '星期四 (4/9)', time: '19:00 - 21:20', location: '七賢國小', maxPlayers: 24, fee: 100 },
+    { id: 'fri_0410', label: '星期五 (4/10)', time: '19:00 - 21:20', location: '七賢國小', maxPlayers: 24, fee: 100 },
+    // { id: 'novice_0402', label: '新手體驗 (4/2)', time: '19:00 - 21:20', location: '七賢國小', maxPlayers: 8, fee: 0 },
   ];
 
   const [activeTab, setActiveTab] = useState(eventDays[0].id);
@@ -99,14 +100,11 @@ export default function PickleballRegistration() {
 
     const dayParticipants = participants.filter(p => p.day_id === activeTab);
     const confirmedTotal = dayParticipants.filter(p => p.status === 'confirmed').reduce((sum, p) => sum + p.people_count, 0);
-    
-    // 🌟 新增：計算目前候補名單上有幾個人
     const waitlistCount = dayParticipants.filter(p => p.status === 'waitlist').length;
-    
     const availableSpots = Math.max(0, activeEvent.maxPlayers - confirmedTotal);
     let insertData = [];
 
-    // 🌟 核心修正：如果名額滿了，【或者】候補區已經有人了，新來的就一律去候補！
+    // 嚴格防插隊邏輯
     if (availableSpots === 0 || waitlistCount > 0) {
       insertData.push({ name, status: 'waitlist', day_id: activeTab, people_count: finalPeople, paddle_count: finalPaddle });
     } else if (finalPeople <= availableSpots) {
@@ -178,30 +176,6 @@ export default function PickleballRegistration() {
             <h2 className="text-xl font-bold text-yellow-800 mb-2">目前暫停報名</h2>
             <p className="text-yellow-700 font-medium">下週場次將於 <strong>星期日晚上 18:00</strong> 準時開放，<br/>請球友們留意時間喔！</p>
           </div>
-        ) : ENABLE_LOGIN_SYSTEM ? (
-          !user ? (
-            <div className="mb-8 p-8 bg-gray-50 rounded-lg border text-center">
-              <p className="text-gray-600 mb-4 font-medium">請先登入，以確認您的報名身分。</p>
-              <button onClick={handleGoogleLogin} className="bg-white border border-gray-300 text-gray-700 font-bold py-3 px-6 rounded-lg hover:bg-gray-100 transition shadow-sm flex items-center justify-center mx-auto gap-3">
-                <span className="text-xl">🌐</span> 使用 Google 帳號登入
-              </button>
-            </div>
-          ) : (
-            <form onSubmit={handleRegister} className="mb-8 space-y-4 bg-gray-50 p-4 rounded-lg border">
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-sm text-green-600 font-bold flex items-center gap-1">✅ 已登入身分</span>
-                <button type="button" onClick={handleLogout} className="text-xs text-red-500 hover:underline">登出帳號</button>
-              </div>
-              <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="請輸入 LINE 群組暱稱或 ID" className="w-full border rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-blue-500 bg-white" required />
-              <div className="flex gap-4">
-                <div className="flex-1"><label className="text-xs text-gray-500 ml-1">報名人數</label><input type="number" min="1" value={peopleCount === '' ? '' : peopleCount} onChange={(e) => setPeopleCount(e.target.value === '' ? '' : parseInt(e.target.value))} className="w-full border rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-blue-500" /></div>
-                {activeEvent.fee !== 0 && (
-                  <div className="flex-1"><label className="text-xs text-gray-500 ml-1">租借球拍</label><input type="number" min="0" value={paddleCount === '' ? '' : paddleCount} onChange={(e) => setPaddleCount(e.target.value === '' ? '' : parseInt(e.target.value))} className="w-full border rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-blue-500" /></div>
-                )}
-              </div>
-              <button type="submit" className="w-full bg-blue-600 text-white font-bold py-3 rounded-lg hover:bg-blue-700 transition shadow-md">送出報名</button>
-            </form>
-          )
         ) : (
           <form onSubmit={handleRegister} className="mb-8 space-y-4 bg-gray-50 p-4 rounded-lg border">
             <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="請輸入 LINE 群組暱稱或 ID" className="w-full border rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-blue-500" required />
