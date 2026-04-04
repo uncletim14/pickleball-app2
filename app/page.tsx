@@ -25,9 +25,9 @@ type Participant = {
 };
 
 export default function PickleballRegistration() {
-  // 🌟 更新：修正了 4/7, 4/9, 4/10 的日期，且星期四加開至 24 人
+  // 🌟 更新：星期二 (4/7) 名額調升至 12 人
   const eventDays = [
-    { id: 'tue_0407', label: '星期二 (4/7)', time: '19:00 - 21:20', location: '七賢國小', maxPlayers: 10, fee: 100 },
+    { id: 'tue_0407', label: '星期二 (4/7)', time: '19:00 - 21:20', location: '七賢國小', maxPlayers: 12, fee: 100 },
     { id: 'thu_0409', label: '星期四 (4/9)', time: '19:00 - 21:20', location: '七賢國小', maxPlayers: 24, fee: 100 },
     { id: 'fri_0410', label: '星期五 (4/10)', time: '19:00 - 21:20', location: '七賢國小', maxPlayers: 24, fee: 100 },
     // { id: 'novice_0402', label: '新手體驗 (4/2)', time: '19:00 - 21:20', location: '七賢國小', maxPlayers: 8, fee: 0 },
@@ -104,7 +104,7 @@ export default function PickleballRegistration() {
     const availableSpots = Math.max(0, activeEvent.maxPlayers - confirmedTotal);
     let insertData = [];
 
-    // 嚴格防插隊邏輯
+    // 嚴格防插隊邏輯：若有名額已滿或候補區有人，一律去候補
     if (availableSpots === 0 || waitlistCount > 0) {
       insertData.push({ name, status: 'waitlist', day_id: activeTab, people_count: finalPeople, paddle_count: finalPaddle });
     } else if (finalPeople <= availableSpots) {
