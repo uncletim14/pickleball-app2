@@ -9,7 +9,7 @@ const ENABLE_LOGIN_SYSTEM = false;
 // 🌟 報名開放總開關
 // false = 關閉報名表，顯示「休息中」公告
 // true  = 正常開放報名
-const IS_REGISTRATION_OPEN = false; 
+const IS_REGISTRATION_OPEN = true; 
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
