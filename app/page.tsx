@@ -175,4 +175,57 @@ export default function PickleballRegistration() {
         ) : activeTab === 'novice' && !HAS_NOVICE_SESSION ? (
           <div className="mb-8 p-8 bg-gray-50 rounded-lg border border-gray-200 text-center shadow-sm">
             <div className="text-5xl mb-4">💤</div>
-            <h2 className="text-xl font-bold
+            <h2 className="text-xl font-bold text-gray-500 mb-2">本週無新手體驗場</h2>
+            <p className="text-gray-400 font-medium">請密切留意 LINE 群組下週通知喔！</p>
+          </div>
+        ) : hasEventPassed(activeEvent.dayOfWeek) ? (
+          <div className="mb-8 p-8 bg-gray-100 rounded-lg border border-gray-300 text-center shadow-sm">
+            <div className="text-5xl mb-4">✅</div>
+            <h2 className="text-xl font-bold text-gray-600 mb-2">本場次已結束</h2>
+            <p className="text-gray-500 font-medium">期待下週再與您一起揮灑汗水！</p>
+          </div>
+        ) : (
+          <form onSubmit={handleRegister} className="mb-8 space-y-4 bg-gray-50 p-4 rounded-lg border">
+            <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="請輸入 LINE 群組暱稱或 ID (LINE Name / ID)" className="w-full border rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-blue-500" required />
+            <div className="flex gap-4">
+              <div className="flex-1"><label className="text-xs text-gray-500 ml-1">報名人數 (People)</label><input type="number" min="1" value={peopleCount === '' ? '' : peopleCount} onChange={(e) => setPeopleCount(e.target.value === '' ? '' : parseInt(e.target.value))} className="w-full border rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-blue-500" /></div>
+              {activeEvent.fee !== 0 && (
+                <div className="flex-1"><label className="text-xs text-gray-500 ml-1">租借球拍 (Rent Paddle)</label><input type="number" min="0" value={paddleCount === '' ? '' : paddleCount} onChange={(e) => setPaddleCount(e.target.value === '' ? '' : parseInt(e.target.value))} className="w-full border rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-blue-500" /></div>
+              )}
+            </div>
+            <button type="submit" className="w-full bg-blue-600 text-white font-bold py-3 rounded-lg hover:bg-blue-700 transition shadow-md">送出報名 (Submit)</button>
+          </form>
+        )}
+
+        {isLoading ? (
+          <div className="text-center py-10 text-gray-400">連線資料庫中...</div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <h2 className="font-bold text-green-600 border-b-2 border-green-200 mb-3 flex justify-between"><span>✅ 報名成功</span><span>{totalConfirmed}/{activeEvent.maxPlayers}</span></h2>
+              <ul className="space-y-2">
+                {confirmedList.length === 0 && <p className="text-gray-400 text-xs">尚無人報名</p>}
+                {confirmedList.map((p, i) => (
+                  <li key={p.id} className="text-sm bg-green-50 p-2 rounded border border-green-100 flex justify-between items-center shadow-sm">
+                    <span>{i+1}. {p.name} <span className="font-bold text-blue-600">({p.people_count}人)</span></span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <h2 className="font-bold text-orange-500 border-b-2 border-orange-200 mb-3">⏳ 候補名單</h2>
+              <ul className="space-y-2">
+                {waitlistList.length === 0 && <p className="text-gray-400 text-xs">目前無人候補</p>}
+                {waitlistList.map((p, i) => (
+                  <li key={p.id} className="text-sm bg-orange-50 p-2 rounded border border-orange-100 shadow-sm">
+                    候補 {i+1}. {p.name} <span className="font-bold text-blue-600">({p.people_count}人)</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        )}
+      </div>
+    </main>
+  );
+}
