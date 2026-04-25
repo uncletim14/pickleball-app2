@@ -6,7 +6,7 @@ import { createClient } from '@supabase/supabase-js';
 // 🛑🛑🛑 系統功能開關 🛑🛑🛑
 const ENABLE_LOGIN_SYSTEM = false; 
 
-// 🆕 新手體驗開關：(如果您想馬上測試看畫面，可以暫時把它改成 true)
+// 🆕 新手體驗開關：(下週不開放，設為 false)
 const HAS_NOVICE_SESSION = false; 
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -40,7 +40,7 @@ const getFormattedDate = (targetDayOfWeek: number) => {
 };
 
 export default function PickleballRegistration() {
-  // 🌟 場次設定
+  // 🌟 場次設定：星期五已拆分為「新手」與「散打」
   const eventDays = [
     { id: 'novice', dayOfWeek: 1, label: HAS_NOVICE_SESSION ? `新手體驗 (${getFormattedDate(1)})` : `新手體驗`, time: HAS_NOVICE_SESSION ? '19:00 - 21:20' : '待公告', location: '七賢國小', maxPlayers: 8, fee: 0 },
     { id: 'mon', dayOfWeek: 1, label: `星期一 (${getFormattedDate(1)})`, time: '19:00 - 21:20', location: '七賢國小', maxPlayers: 16, fee: 100 },
@@ -157,11 +157,11 @@ export default function PickleballRegistration() {
           <p><strong>💰 費用 (Fee)：</strong> {activeEvent.fee === 0 ? <span className="text-green-600 font-bold">免費 (Free)</span> : `${activeEvent.fee} / 人 (租借球拍 Paddle rental +50)`}</p>
           <p><strong>👥 剩餘正取 (Available spots)：</strong> <span className="text-red-600 font-bold">{Math.max(0, activeEvent.maxPlayers - totalConfirmed)} 人</span></p>
           
-          {/* 🌟 只有點擊新手區才會出現的英文備註 */}
+          {/* 🌟 只有點擊新手區才會出現的英文備註 (已更新為無教學說明) */}
           {(activeTab === 'novice' || activeTab === 'fri_novice') && (
             <div className="mt-3 pt-3 border-t border-blue-200 text-blue-800">
               <p className="font-medium">🌟 <strong>For English Speakers:</strong></p>
-              <p className="text-xs md:text-sm mt-1">Welcome to join our beginner session! Basic rules and techniques will be introduced. If you don't have a paddle, you can rent one for NT$50. Please enter your LINE Name or ID below to register.</p>
+              <p className="text-xs md:text-sm mt-1">Welcome to our beginner session! Please note that no formal instruction is provided; this is a friendly play session designed for new players to practice together. If you don't have a paddle, you can rent one for NT$50. Please enter your LINE Name or ID below to register.</p>
             </div>
           )}
         </div>
@@ -179,53 +179,4 @@ export default function PickleballRegistration() {
             <p className="text-gray-400 font-medium">請密切留意 LINE 群組下週通知喔！</p>
           </div>
         ) : hasEventPassed(activeEvent.dayOfWeek) ? (
-          <div className="mb-8 p-8 bg-gray-100 rounded-lg border border-gray-300 text-center shadow-sm">
-            <div className="text-5xl mb-4">✅</div>
-            <h2 className="text-xl font-bold text-gray-600 mb-2">本場次已結束</h2>
-            <p className="text-gray-500 font-medium">期待下週再與您一起揮灑汗水！</p>
-          </div>
-        ) : (
-          <form onSubmit={handleRegister} className="mb-8 space-y-4 bg-gray-50 p-4 rounded-lg border">
-            <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="請輸入 LINE 群組暱稱或 ID (LINE Name / ID)" className="w-full border rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-blue-500" required />
-            <div className="flex gap-4">
-              <div className="flex-1"><label className="text-xs text-gray-500 ml-1">報名人數 (People)</label><input type="number" min="1" value={peopleCount === '' ? '' : peopleCount} onChange={(e) => setPeopleCount(e.target.value === '' ? '' : parseInt(e.target.value))} className="w-full border rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-blue-500" /></div>
-              {activeEvent.fee !== 0 && (
-                <div className="flex-1"><label className="text-xs text-gray-500 ml-1">租借球拍 (Rent Paddle)</label><input type="number" min="0" value={paddleCount === '' ? '' : paddleCount} onChange={(e) => setPaddleCount(e.target.value === '' ? '' : parseInt(e.target.value))} className="w-full border rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-blue-500" /></div>
-              )}
-            </div>
-            <button type="submit" className="w-full bg-blue-600 text-white font-bold py-3 rounded-lg hover:bg-blue-700 transition shadow-md">送出報名 (Submit)</button>
-          </form>
-        )}
-
-        {isLoading ? (
-          <div className="text-center py-10 text-gray-400">連線資料庫中...</div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <h2 className="font-bold text-green-600 border-b-2 border-green-200 mb-3 flex justify-between"><span>✅ 報名成功</span><span>{totalConfirmed}/{activeEvent.maxPlayers}</span></h2>
-              <ul className="space-y-2">
-                {confirmedList.length === 0 && <p className="text-gray-400 text-xs">尚無人報名</p>}
-                {confirmedList.map((p, i) => (
-                  <li key={p.id} className="text-sm bg-green-50 p-2 rounded border border-green-100 flex justify-between items-center shadow-sm">
-                    <span>{i+1}. {p.name} <span className="font-bold text-blue-600">({p.people_count}人)</span></span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div>
-              <h2 className="font-bold text-orange-500 border-b-2 border-orange-200 mb-3">⏳ 候補名單</h2>
-              <ul className="space-y-2">
-                {waitlistList.length === 0 && <p className="text-gray-400 text-xs">目前無人候補</p>}
-                {waitlistList.map((p, i) => (
-                  <li key={p.id} className="text-sm bg-orange-50 p-2 rounded border border-orange-100 shadow-sm">
-                    候補 {i+1}. {p.name} <span className="font-bold text-blue-600">({p.people_count}人)</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        )}
-      </div>
-    </main>
-  );
-}
+          <div className="mb-8 p-8 bg-gray-10
