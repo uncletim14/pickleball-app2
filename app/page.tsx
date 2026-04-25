@@ -40,10 +40,10 @@ const getFormattedDate = (targetDayOfWeek: number) => {
 };
 
 export default function PickleballRegistration() {
-  // 🌟 場次設定：星期五已拆分為「新手」與「散打」
+  // 🌟 場次設定：星期一已修正為 24 人
   const eventDays = [
     { id: 'novice', dayOfWeek: 1, label: HAS_NOVICE_SESSION ? `新手體驗 (${getFormattedDate(1)})` : `新手體驗`, time: HAS_NOVICE_SESSION ? '19:00 - 21:20' : '待公告', location: '七賢國小', maxPlayers: 8, fee: 0 },
-    { id: 'mon', dayOfWeek: 1, label: `星期一 (${getFormattedDate(1)})`, time: '19:00 - 21:20', location: '七賢國小', maxPlayers: 16, fee: 100 },
+    { id: 'mon', dayOfWeek: 1, label: `星期一 (${getFormattedDate(1)})`, time: '19:00 - 21:20', location: '七賢國小', maxPlayers: 24, fee: 100 },
     { id: 'tue', dayOfWeek: 2, label: `星期二 (${getFormattedDate(2)})`, time: '19:00 - 21:20', location: '七賢國小', maxPlayers: 14, fee: 100 },
     { id: 'thu', dayOfWeek: 4, label: `星期四 (${getFormattedDate(4)})`, time: '19:00 - 21:20', location: '七賢國小', maxPlayers: 24, fee: 100 },
     { id: 'fri_novice', dayOfWeek: 5, label: `週五 (新手組) (${getFormattedDate(5)})`, time: '19:00 - 21:20', location: '七賢國小', maxPlayers: 8, fee: 100 },
@@ -157,7 +157,6 @@ export default function PickleballRegistration() {
           <p><strong>💰 費用 (Fee)：</strong> {activeEvent.fee === 0 ? <span className="text-green-600 font-bold">免費 (Free)</span> : `${activeEvent.fee} / 人 (租借球拍 Paddle rental +50)`}</p>
           <p><strong>👥 剩餘正取 (Available spots)：</strong> <span className="text-red-600 font-bold">{Math.max(0, activeEvent.maxPlayers - totalConfirmed)} 人</span></p>
           
-          {/* 🌟 只有點擊新手區才會出現的英文備註 (已更新為無教學說明) */}
           {(activeTab === 'novice' || activeTab === 'fri_novice') && (
             <div className="mt-3 pt-3 border-t border-blue-200 text-blue-800">
               <p className="font-medium">🌟 <strong>For English Speakers:</strong></p>
