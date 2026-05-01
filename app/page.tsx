@@ -6,9 +6,6 @@ import { createClient } from '@supabase/supabase-js';
 // 🛑🛑🛑 系統功能開關 🛑🛑🛑
 const ENABLE_LOGIN_SYSTEM = false; 
 
-// 🆕 新手體驗開關：(下週不開放，設為 false)
-const HAS_NOVICE_SESSION = false; 
-
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
@@ -40,11 +37,12 @@ const getFormattedDate = (targetDayOfWeek: number) => {
 };
 
 export default function PickleballRegistration() {
-  // 🌟 場次設定：星期一已修正為 24 人
+  // 🌟 場次設定：週一分流、隱藏週二
   const eventDays = [
-    { id: 'novice', dayOfWeek: 1, label: HAS_NOVICE_SESSION ? `新手體驗 (${getFormattedDate(1)})` : `新手體驗`, time: HAS_NOVICE_SESSION ? '19:00 - 21:20' : '待公告', location: '七賢國小', maxPlayers: 8, fee: 0 },
-    { id: 'mon', dayOfWeek: 1, label: `星期一 (${getFormattedDate(1)})`, time: '19:00 - 21:20', location: '七賢國小', maxPlayers: 24, fee: 100 },
-    { id: 'tue', dayOfWeek: 2, label: `星期二 (${getFormattedDate(2)})`, time: '19:00 - 21:20', location: '七賢國小', maxPlayers: 14, fee: 100 },
+    { id: 'mon_novice', dayOfWeek: 1, label: `週一 (體驗組) (${getFormattedDate(1)})`, time: '19:00 - 21:20', location: '七賢國小', maxPlayers: 8, fee: 0 }, // 體驗組預設免費，若要收費請把 0 改為 100
+    { id: 'mon_regular', dayOfWeek: 1, label: `週一 (散打組) (${getFormattedDate(1)})`, time: '19:00 - 21:20', location: '七賢國小', maxPlayers: 16, fee: 100 },
+    // 星期二已隱藏
+    // { id: 'tue', dayOfWeek: 2, label: `星期二 (${getFormattedDate(2)})`, time: '19:00 - 21:20', location: '七賢國小', maxPlayers: 14, fee: 100 },
     { id: 'thu', dayOfWeek: 4, label: `星期四 (${getFormattedDate(4)})`, time: '19:00 - 21:20', location: '七賢國小', maxPlayers: 24, fee: 100 },
     { id: 'fri_novice', dayOfWeek: 5, label: `週五 (新手組) (${getFormattedDate(5)})`, time: '19:00 - 21:20', location: '七賢國小', maxPlayers: 8, fee: 100 },
     { id: 'fri_regular', dayOfWeek: 5, label: `週五 (散打組) (${getFormattedDate(5)})`, time: '19:00 - 21:20', location: '七賢國小', maxPlayers: 16, fee: 100 },
@@ -146,7 +144,7 @@ export default function PickleballRegistration() {
               onClick={() => setActiveTab(day.id)}
               className={`px-4 py-2 rounded-t-lg font-medium transition ${activeTab === day.id ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`}
             >
-              {day.id === 'novice' ? '🐣 新手體驗' : day.label}
+              {day.label}
             </button>
           ))}
         </div>
@@ -157,7 +155,8 @@ export default function PickleballRegistration() {
           <p><strong>💰 費用 (Fee)：</strong> {activeEvent.fee === 0 ? <span className="text-green-600 font-bold">免費 (Free)</span> : `${activeEvent.fee} / 人 (租借球拍 Paddle rental +50)`}</p>
           <p><strong>👥 剩餘正取 (Available spots)：</strong> <span className="text-red-600 font-bold">{Math.max(0, activeEvent.maxPlayers - totalConfirmed)} 人</span></p>
           
-          {(activeTab === 'novice' || activeTab === 'fri_novice') && (
+          {/* 🌟 週一體驗組 與 週五新手組 都會出現英文備註 */}
+          {(activeTab === 'mon_novice' || activeTab === 'fri_novice') && (
             <div className="mt-3 pt-3 border-t border-blue-200 text-blue-800">
               <p className="font-medium">🌟 <strong>For English Speakers:</strong></p>
               <p className="text-xs md:text-sm mt-1">Welcome to our beginner session! Please note that no formal instruction is provided; this is a friendly play session designed for new players to practice together. If you don't have a paddle, you can rent one for NT$50. Please enter your LINE Name or ID below to register.</p>
@@ -170,12 +169,6 @@ export default function PickleballRegistration() {
             <div className="text-5xl mb-4">⏳</div>
             <h2 className="text-xl font-bold text-yellow-800 mb-2">目前暫停報名</h2>
             <p className="text-yellow-700 font-medium">下週場次將於 <strong>星期六晚上 18:00</strong> 準時開放</p>
-          </div>
-        ) : activeTab === 'novice' && !HAS_NOVICE_SESSION ? (
-          <div className="mb-8 p-8 bg-gray-50 rounded-lg border border-gray-200 text-center shadow-sm">
-            <div className="text-5xl mb-4">💤</div>
-            <h2 className="text-xl font-bold text-gray-500 mb-2">本週無新手體驗場</h2>
-            <p className="text-gray-400 font-medium">請密切留意 LINE 群組下週通知喔！</p>
           </div>
         ) : hasEventPassed(activeEvent.dayOfWeek) ? (
           <div className="mb-8 p-8 bg-gray-100 rounded-lg border border-gray-300 text-center shadow-sm">
