@@ -110,32 +110,16 @@ export default function QiXianPickleball() {
     if (code === p.edit_code) {
       const newCountStr = window.prompt(`目前人數為 ${p.count} 位，請輸入新的人數 (1-4)：`, p.count.toString());
       const newCount = parseInt(newCountStr || "");
-      
-      if (isNaN(newCount) || newCount < 1 || newCount > 4) {
-        alert("輸入無效，請輸入 1 到 4 之間的數字。");
-        return;
-      }
-
-      const { error } = await supabase
-        .from('tournament_participants')
-        .update({ count: newCount })
-        .eq('id', p.id);
-
-      if (!error) {
-        alert(`人數已成功修改為 ${newCount} 位！`);
-        fetchParticipants();
-      } else {
-        alert("修改失敗，請稍後再試。");
-      }
-    } else if (code !== null) {
-      alert("密碼錯誤！");
-    }
+      if (isNaN(newCount) || newCount < 1 || newCount > 4) { alert("輸入無效"); return; }
+      const { error } = await supabase.from('tournament_participants').update({ count: newCount }).eq('id', p.id);
+      if (!error) { alert("人數已成功修改！"); fetchParticipants(); }
+    } else if (code !== null) { alert("密碼錯誤！"); }
   };
 
   const handleCancel = async (p: Participant) => {
     const code = window.prompt("請輸入 4 碼密碼取消所有報名：");
     if (code === p.edit_code) {
-      if (window.confirm(`確定要取消「${p.name}」共 ${p.count} 位的報名嗎？`)) {
+      if (window.confirm(`確定要取消報名嗎？`)) {
         await supabase.from('tournament_participants').delete().eq('id', p.id);
         fetchParticipants();
       }
@@ -148,15 +132,15 @@ export default function QiXianPickleball() {
 
   return (
     <main className="min-h-screen bg-slate-900 p-4 md:p-8 text-slate-100 font-sans tracking-tight">
-      <div className="max-w-4xl mx-auto">
-        <header className="text-center mb-8">
-          <div className="flex flex-col md:flex-row items-center justify-center gap-4 mb-4">
-            <Image src="/七賢LOGO.png" alt="LOGO" width={80} height={80} className="rounded-full shadow-lg" />
-            <h1 className="text-4xl md:text-5xl font-black text-emerald-400 italic tracking-widest uppercase">七賢國小匹克交流團</h1>
+      <div className="max-w-5xl mx-auto">
+        <header className="text-center mb-10">
+          <div className="flex flex-col md:flex-row items-center justify-center gap-6 mb-6">
+            <Image src="/七賢LOGO.png" alt="LOGO" width={100} height={100} className="rounded-full shadow-2xl" />
+            <h1 className="text-5xl md:text-6xl font-black text-emerald-400 italic tracking-widest uppercase">七賢國小匹克交流團</h1>
           </div>
           
-          <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-4 mb-6 inline-block text-emerald-400 font-bold">
-            <div className="flex flex-wrap justify-center gap-x-6 gap-y-2">
+          <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-6 mb-8 inline-block text-2xl font-bold">
+            <div className="flex flex-wrap justify-center gap-x-10 gap-y-3 text-emerald-400">
               <span>🕒 19:00 - 21:20</span>
               <span>💰 $100 / 人</span>
               <span>🏸 拍子租借 $50</span>
@@ -164,82 +148,84 @@ export default function QiXianPickleball() {
             </div>
           </div>
 
-          <div className="flex justify-center gap-3 flex-wrap">
+          <div className="flex justify-center gap-4 flex-wrap">
             {dayOptions.map(d => (
-              <button key={d.key} onClick={() => setSelectedDay(d)} className={`px-5 py-3 rounded-2xl font-bold transition-all ${selectedDay.key === d.key ? 'bg-emerald-500 text-white shadow-lg' : 'bg-slate-800 text-slate-500 hover:bg-slate-700'}`}>
+              <button key={d.key} onClick={() => setSelectedDay(d)} className={`px-6 py-4 rounded-2xl font-black text-xl transition-all ${selectedDay.key === d.key ? 'bg-emerald-500 text-white shadow-xl' : 'bg-slate-800 text-slate-500 hover:bg-slate-700'}`}>
                 {d.label}
               </button>
             ))}
           </div>
         </header>
 
-        <div className="flex gap-4 mb-10">
+        {/* 頂部大組別按鈕 */}
+        <div className="flex gap-6 mb-12">
           {categories.map(cat => (
-            <button key={cat.id} onClick={() => setActiveTab(cat.label)} className={`flex-1 py-10 px-4 rounded-[2rem] transition-all border-4 flex flex-col items-center justify-center ${activeTab === cat.label ? 'bg-slate-800 border-emerald-500 text-emerald-400 shadow-xl' : 'bg-slate-900 border-slate-800 text-slate-700'}`}>
-              <span className="text-5xl font-black mb-3">{cat.label}</span>
-              <span className="text-2xl font-black opacity-90">({cat.max}人)</span>
+            <button key={cat.id} onClick={() => setActiveTab(cat.label)} className={`flex-1 py-12 px-6 rounded-[3rem] transition-all border-4 flex flex-col items-center justify-center ${activeTab === cat.label ? 'bg-slate-800 border-emerald-500 text-emerald-400 shadow-[0_0_50px_rgba(16,185,129,0.3)]' : 'bg-slate-900 border-slate-800 text-slate-700'}`}>
+              <span className="text-6xl font-black mb-4">{cat.label}</span>
+              <span className="text-3xl font-black opacity-90">({cat.max}人)</span>
             </button>
           ))}
         </div>
 
-        <div className="grid md:grid-cols-5 gap-8">
-          <form onSubmit={handleRegister} className="md:col-span-2 bg-slate-800 p-8 rounded-[2.5rem] space-y-5 border border-slate-700 shadow-2xl h-fit">
-            <h2 className="font-bold text-2xl text-white">快速報名</h2>
-            
+        <div className="grid lg:grid-cols-5 gap-10">
+          {/* 左側報名表 */}
+          <form onSubmit={handleRegister} className="lg:col-span-2 bg-slate-800 p-10 rounded-[3rem] space-y-6 border border-slate-700 shadow-2xl h-fit">
+            <h2 className="font-black text-3xl text-white mb-4 italic">快速報名</h2>
             <div>
-              <label className="text-xs text-slate-500 ml-1 italic font-bold">1. 選擇人數</label>
-              <select value={formData.count} onChange={e => setFormData({...formData, count: e.target.value})} className="w-full bg-slate-900 p-5 rounded-2xl outline-none border border-slate-700 text-xl text-white appearance-none">
+              <label className="text-sm text-slate-500 ml-1 font-black uppercase tracking-widest">1. 選擇人數</label>
+              <select value={formData.count} onChange={e => setFormData({...formData, count: e.target.value})} className="w-full bg-slate-900 p-6 rounded-2xl outline-none border border-slate-700 text-2xl font-black text-white appearance-none mt-2">
                 {[1,2,3,4].map(n => <option key={n} value={n}>{n} 位</option>)}
               </select>
             </div>
-
             <div>
-              <label className="text-xs text-slate-500 ml-1 italic font-bold">2. 代表姓名</label>
-              <input type="text" required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} placeholder="輸入名字" className="w-full bg-slate-900 p-5 rounded-2xl outline-none border border-slate-700 text-xl text-white" />
+              <label className="text-sm text-slate-500 ml-1 font-black uppercase tracking-widest">2. 代表姓名</label>
+              <input type="text" required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} placeholder="輸入名字" className="w-full bg-slate-900 p-6 rounded-2xl outline-none border border-slate-700 text-2xl font-black text-white mt-2" />
             </div>
-            
             <div>
-              <label className="text-xs text-slate-500 ml-1 italic font-bold">3. 密碼 (4 碼)</label>
-              <input type="password" maxLength={4} required value={formData.edit_code} onChange={e => setFormData({...formData, edit_code: e.target.value})} placeholder="修改取消用" className="w-full bg-slate-900 p-5 rounded-2xl outline-none border border-slate-700 text-xl text-white" />
+              <label className="text-sm text-slate-500 ml-1 font-black uppercase tracking-widest">3. 密碼 (4 碼)</label>
+              <input type="password" maxLength={4} required value={formData.edit_code} onChange={e => setFormData({...formData, edit_code: e.target.value})} placeholder="修改取消用" className="w-full bg-slate-900 p-6 rounded-2xl outline-none border border-slate-700 text-2xl font-black text-white mt-2" />
             </div>
-            
-            <button className="w-full bg-emerald-500 py-5 rounded-2xl font-black text-2xl hover:bg-emerald-400 transition-all text-white shadow-lg">確認報名</button>
+            <button className="w-full bg-emerald-500 py-6 rounded-2xl font-black text-3xl hover:bg-emerald-400 shadow-xl text-white transition-all active:scale-95">確認報名</button>
           </form>
 
-          <div className="md:col-span-3">
-            <div className="flex justify-between items-center mb-6 px-2">
-              <h2 className="font-bold text-2xl tracking-tighter">報名清單</h2>
-              <span className="bg-slate-800 px-4 py-2 rounded-full text-sm text-slate-400 font-bold">
-                已收：{currentList.reduce((sum, p) => sum + (p.count || 1), 0)} / {currentMax}
+          {/* 右側清單 - 🌟 這裡字體全部放大三倍 🌟 */}
+          <div className="lg:col-span-3">
+            <div className="flex justify-between items-center mb-8 px-4">
+              <h2 className="font-black text-4xl italic tracking-tighter">報名清單</h2>
+              <span className="bg-slate-800 px-6 py-3 rounded-full text-xl text-slate-400 font-black">
+                {currentList.reduce((sum, p) => sum + (p.count || 1), 0)} / {currentMax}
               </span>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-6">
               {currentList.map((p) => {
                 const pCount = p.count || 1;
                 const isWaitlist = runningTotal >= currentMax;
                 runningTotal += pCount;
                 
                 return (
-                  <div key={p.id} className="bg-slate-800/40 p-5 rounded-3xl flex justify-between items-center border border-slate-800 hover:border-slate-700 transition-all">
-                    <div className="flex items-center gap-4">
-                      <span className={`text-[10px] font-black px-2 py-1 rounded-md ${isWaitlist ? 'bg-orange-500/10 text-orange-500' : 'bg-emerald-500/10 text-emerald-400'}`}>
+                  <div key={p.id} className="bg-slate-800/60 p-8 rounded-[2.5rem] flex flex-col sm:flex-row justify-between items-center border-2 border-slate-800 hover:border-emerald-500/50 transition-all gap-6 shadow-xl">
+                    <div className="flex items-center gap-8 w-full sm:w-auto">
+                      {/* 🌟 放大正取/備取標籤 */}
+                      <span className={`text-xl font-black px-5 py-2 rounded-xl shrink-0 ${isWaitlist ? 'bg-orange-500 text-white' : 'bg-emerald-500 text-white'}`}>
                         {isWaitlist ? '備取' : '正取'}
                       </span>
                       <div className="flex flex-col">
-                        <span className="font-bold text-xl">{p.name}</span>
-                        <span className="text-xs text-slate-500 font-bold tracking-widest">{pCount} 人</span>
+                        {/* 🌟 放大姓名與人數 */}
+                        <span className="font-black text-4xl text-white tracking-tight">{p.name}</span>
+                        <span className="text-2xl text-emerald-400 font-black mt-1">{pCount} 位名額</span>
                       </div>
                     </div>
                     
-                    {/* 修改與取消按鈕 */}
-                    <div className="flex gap-2">
-                      <button onClick={() => handleEdit(p)} className="text-xs bg-slate-700 hover:bg-slate-600 text-slate-300 px-3 py-2 rounded-xl transition-all font-bold">修改</button>
-                      <button onClick={() => handleCancel(p)} className="text-xs bg-slate-900/50 hover:text-red-400 text-slate-600 px-3 py-2 rounded-xl transition-all font-bold">取消</button>
+                    {/* 🌟 放大修改與取消按鈕 */}
+                    <div className="flex gap-4 w-full sm:w-auto">
+                      <button onClick={() => handleEdit(p)} className="flex-1 sm:flex-none text-2xl bg-slate-700 hover:bg-emerald-600 text-white px-8 py-5 rounded-2xl transition-all font-black shadow-lg">修改</button>
+                      <button onClick={() => handleCancel(p)} className="flex-1 sm:flex-none text-2xl bg-red-900/30 hover:bg-red-600 text-red-500 hover:text-white px-8 py-5 rounded-2xl transition-all font-black border-2 border-red-900/50">取消</button>
                     </div>
                   </div>
                 );
               })}
+              {currentList.length === 0 && <div className="text-center py-24 text-slate-700 font-black text-3xl italic">目前尚無人報名</div>}
             </div>
           </div>
         </div>
