@@ -70,23 +70,44 @@ export default function QiXianPickleball() {
     }
   };
 
+  // 🌟 核心功能：自動遞補邏輯
+  const autoRecheckStatus = async (updatedList: Participant[]) => {
+    const currentMax = categories.find(c => c.label === activeTab)?.max || 16;
+    let runningTotal = 0;
+    
+    // 過濾出當前日期與組別的所有人，並按 ID 排序（確保排隊順序不變）
+    const targetGroup = updatedList
+      .filter(p => p.category === activeTab && p.day_key === selectedDay.key)
+      .sort((a, b) => a.id - b.id);
+
+    for (const p of targetGroup) {
+      let expectedStatus = '正取';
+      if (runningTotal + p.count > currentMax) {
+        expectedStatus = '備取';
+      } else {
+        runningTotal += p.count;
+      }
+
+      // 如果當前狀態與預期不符（例如本來是備取，現在可以變正取），就更新資料庫
+      if (p.status !== expectedStatus) {
+        await supabase.from('tournament_participants').update({ status: expectedStatus }).eq('id', p.id);
+      }
+    }
+    fetchParticipants();
+  };
+
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     const regCount = parseInt(formData.count);
     if (formData.edit_code.length !== 4) { alert("請設定 4 位數取消密碼"); return; }
     
-    const currentList = participants.filter(p => p.category === activeTab && p.day_key === selectedDay.key);
-    const totalFilled = currentList.filter(p => (p.status || '正取') === '正取').reduce((sum, p) => sum + (p.count || 1), 0);
+    const currentGroup = participants.filter(p => p.category === activeTab && p.day_key === selectedDay.key);
+    const totalFilled = currentGroup.filter(p => p.status === '正取').reduce((sum, p) => sum + (p.count || 0), 0);
     const currentMax = categories.find(c => c.label === activeTab)?.max || 16;
 
     let finalStatus = '正取';
     if ((totalFilled + regCount) > currentMax) {
-      const remaining = currentMax - totalFilled;
-      const msg = remaining > 0 
-        ? `目前正取僅剩 ${remaining} 個名額，您的報名人數 (${regCount}位) 超過餘額。\n\n按「確定」將此筆 ${regCount} 位全數轉為【備取】？`
-        : `正取已滿，此筆報名 (${regCount}位) 將全數列為【備取】，確定嗎？`;
-      
-      if (!window.confirm(msg)) return;
+      if (!window.confirm("正取名額不足，將全數轉為【備取】，確定嗎？")) return;
       finalStatus = '備取'; 
     }
 
@@ -100,7 +121,6 @@ export default function QiXianPickleball() {
     }]);
 
     if (!error) {
-      alert(finalStatus === '備取' ? `已轉為備取登記！` : `報名成功！`);
       setFormData({ name: '', edit_code: '', count: '1' });
       fetchParticipants();
     }
@@ -111,32 +131,14 @@ export default function QiXianPickleball() {
     if (code === p.edit_code) {
       const newCountStr = window.prompt(`目前人數為 ${p.count} 位，請輸入新的人數 (1-4)：`, p.count.toString());
       const newCount = parseInt(newCountStr || "");
-      if (isNaN(newCount) || newCount < 1 || newCount > 4) { alert("輸入無效"); return; }
+      if (isNaN(newCount) || newCount < 1 || newCount > 4) return;
 
-      const categoryList = participants.filter(item => item.category === p.category && item.day_key === p.day_key);
-      const currentTotalExcludeSelf = categoryList
-        .filter(item => item.id !== p.id && (item.status || '正取') === '正取')
-        .reduce((sum, item) => sum + (item.count || 0), 0);
-      
-      const currentMax = categories.find(c => c.label === p.category)?.max || 16;
-      
-      let newStatus = p.status || '正取';
-      
-      if (currentTotalExcludeSelf + newCount <= currentMax) {
-        newStatus = '正取';
-      } else {
-        if ((p.status || '正取') === '正取') {
-          if (!window.confirm("修改後人數將超過上限，是否要轉為【備取】？")) return;
-          newStatus = '備取';
-        } else {
-          alert("名額仍不足，維持備取狀態。");
-        }
-      }
-
-      const { error } = await supabase.from('tournament_participants').update({ count: newCount, status: newStatus }).eq('id', p.id);
-      if (!error) { 
-        alert(`已成功修改為 ${newCount} 位 (${newStatus})！`); 
-        fetchParticipants(); 
+      const { error } = await supabase.from('tournament_participants').update({ count: newCount }).eq('id', p.id);
+      if (!error) {
+        // 修改完人數後，立刻觸發「全體重新檢查狀態」，實現自動遞補
+        const { data: freshData } = await supabase.from('tournament_participants').select('*');
+        if (freshData) await autoRecheckStatus(freshData);
+        alert("人數已修改，系統已重新調整正備取狀態！");
       }
     } else if (code !== null) { alert("密碼錯誤！"); }
   };
@@ -145,15 +147,19 @@ export default function QiXianPickleball() {
     const code = window.prompt("請輸入 4 碼密碼取消報名：");
     if (code === p.edit_code) {
       if (window.confirm(`確定要取消報名嗎？`)) {
-        await supabase.from('tournament_participants').delete().eq('id', p.id);
-        fetchParticipants();
+        const { error } = await supabase.from('tournament_participants').delete().eq('id', p.id);
+        if (!error) {
+          // 取消完畢後，立刻觸發遞補檢查
+          const { data: freshData } = await supabase.from('tournament_participants').select('*');
+          if (freshData) await autoRecheckStatus(freshData);
+        }
       }
     } else if (code !== null) { alert("密碼錯誤！"); }
   };
 
   const currentList = participants.filter(p => p.category === activeTab && p.day_key === selectedDay.key);
   const currentMax = categories.find(c => c.label === activeTab)?.max || 16;
-  const confirmedCount = currentList.filter(p => (p.status || '正取') === '正取').reduce((sum, p) => sum + (p.count || 0), 0);
+  const confirmedCount = currentList.filter(p => p.status === '正取').reduce((sum, p) => sum + (p.count || 0), 0);
 
   return (
     <main className="min-h-screen bg-slate-900 p-4 md:p-8 text-slate-100 font-sans tracking-tight">
@@ -214,10 +220,10 @@ export default function QiXianPickleball() {
             </div>
             <div className="space-y-4">
               {currentList.map((p) => (
-                <div key={p.id} className="bg-slate-800/60 p-5 rounded-[2rem] flex flex-col sm:flex-row justify-between items-center border-2 border-slate-800 hover:border-emerald-500/50 transition-all gap-4">
+                <div key={p.id} className="bg-slate-800/60 p-5 rounded-[2rem] flex flex-col sm:flex-row justify-between items-center border-2 border-slate-800 hover:border-emerald-500/50 transition-all gap-4 shadow-xl">
                   <div className="flex items-center gap-6 w-full sm:w-auto">
-                    <span className={`text-xl font-black px-5 py-2 rounded-xl shrink-0 w-24 text-center ${ (p.status || '正取') === '備取' ? 'bg-orange-500 text-white' : 'bg-emerald-500 text-white'}`}>
-                      {p.status || '正取'}
+                    <span className={`text-xl font-black px-5 py-2 rounded-xl shrink-0 w-24 text-center ${ p.status === '備取' ? 'bg-orange-500 text-white' : 'bg-emerald-500 text-white'}`}>
+                      {p.status}
                     </span>
                     <div className="flex items-baseline gap-4">
                       <span className="font-black text-4xl text-white tracking-tight">{p.name}</span>
