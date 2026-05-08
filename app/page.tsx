@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
+import Image from 'next/image'; // 引入 Next.js 的圖片元件
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -103,9 +104,20 @@ export default function QiXianPickleball() {
     <main className="min-h-screen bg-slate-900 p-4 md:p-8 text-slate-100 font-sans tracking-tight">
       <div className="max-w-4xl mx-auto">
         <header className="text-center mb-10">
-          <h1 className="text-4xl md:text-5xl font-black text-emerald-400 mb-3 italic tracking-widest uppercase">
-            七賢國小匹克交流團
-          </h1>
+          {/* 🌟 標題區塊：加入 LOGO 🌟 */}
+          <div className="flex flex-col md:flex-row items-center justify-center gap-4 mb-3">
+            <Image 
+              src="/七賢LOGO.png" 
+              alt="七賢LOGO" 
+              width={80} 
+              height={80} 
+              className="rounded-full shadow-lg"
+            />
+            <h1 className="text-4xl md:text-5xl font-black text-emerald-400 italic tracking-widest uppercase">
+              七賢國小匹克交流團
+            </h1>
+          </div>
+          
           <p className="text-slate-500 text-sm mb-6 font-bold">每週六 18:00 自動更新下週日期</p>
           <div className="flex justify-center gap-3 flex-wrap">
             {dayOptions.map(d => (
@@ -116,7 +128,7 @@ export default function QiXianPickleball() {
           </div>
         </header>
 
-        {/* 🌟 核心按鈕：字體放大兩倍，整體高度與寬度也同步提升 🌟 */}
+        {/* 核心按鈕區 */}
         <div className="flex gap-4 mb-12">
           {categories.map(cat => (
             <button 
