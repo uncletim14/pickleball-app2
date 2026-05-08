@@ -78,27 +78,51 @@ export default function QiXianPickleball() {
   };
 
   // --- 🌟 修正後的報名邏輯 (約在第 85 行附近) ---
-  const handleRegister = async (e: React.FormEvent) => {
+ const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     const regCount = parseInt(formData.count);
     if (formData.edit_code.length !== 4) { alert("請設定 4 位數取消密碼"); return; }
     
-    // 計算該類別目前總人數
-    const categoryList = participants.filter(p => p.category === activeTab && p.day_key === selectedDay.key);
-    const totalFilled = categoryList.reduce((sum, p) => sum + (p.count || 1), 0);
+    // 1. 重新抓取最新名單計算總人數，確保計算最準確
+    const { data: latestData } = await supabase.from('tournament_participants').select('count').eq('day_key', selectedDay.key).eq('category', activeTab);
+    const totalFilled = (latestData || []).reduce((sum, p) => sum + (p.count || 1), 0);
     const currentMax = categories.find(c => c.label === activeTab)?.max || 16;
 
-    // 判斷「加上這次報名人數」後是否超過上限
+    // 2. 判斷加入這筆「整批人數」後是否會超過上限
     const isExceeding = (totalFilled + regCount) > currentMax;
 
     if (isExceeding) {
       const remaining = currentMax - totalFilled;
-      const msg = remaining > 0 
-        ? `目前正取僅剩 ${remaining} 個名額，您的報名人數 (${regCount}位) 已超過餘額。\n\n點擊「確定」將此筆報名全數轉為【備取】，或點擊「取消」重新調整人數。`
-        : `正取已滿，此筆報名 (${regCount}位) 將全數列為【備取】，確定嗎？`;
+      let msg = "";
+      
+      if (remaining > 0) {
+        // 還有剩名額但不足以容納這整批人
+        msg = `目前正取僅剩 ${remaining} 個名額，您的報名人數 (${regCount}位) 超過餘額。\n\n按「確定」將此筆 ${regCount} 位全數轉為【備取】？\n(若想搶佔最後名額，請點取消並改報 ${remaining} 位)`;
+      } else {
+        // 正取已經全滿
+        msg = `正取已滿，此筆報名 (${regCount}位) 將全數列為【備取】，確定嗎？`;
+      }
       
       if (!window.confirm(msg)) return;
     }
+
+    // 3. 執行插入動作
+    const { error } = await supabase.from('tournament_participants').insert([{
+      name: formData.name.trim(),
+      category: activeTab,
+      day_key: selectedDay.key,
+      edit_code: formData.edit_code,
+      count: regCount
+    }]);
+
+    if (!error) {
+      alert(isExceeding ? `已將 ${regCount} 位全數轉為備取登記！` : `報名成功！已登記 ${regCount} 位。`);
+      setFormData({ name: '', edit_code: '', count: '1' });
+      fetchParticipants();
+    } else {
+      alert("報名失敗：" + error.message);
+    }
+  };
 
     const { error } = await supabase.from('tournament_participants').insert([{
       name: formData.name.trim(),
