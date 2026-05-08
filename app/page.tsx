@@ -14,7 +14,7 @@ type Participant = {
   category: string;
   day_key: string;
   edit_code: string;
-  count: number; // 新增：記錄該筆報名的人數
+  count: number;
 };
 
 export default function QiXianPickleball() {
@@ -82,7 +82,6 @@ export default function QiXianPickleball() {
     const regCount = parseInt(formData.count);
     if (formData.edit_code.length !== 4) { alert("請設定 4 位數取消密碼"); return; }
     
-    // 計算該類別目前總人數（加總每一筆的 count）
     const categoryList = participants.filter(p => p.category === activeTab && p.day_key === selectedDay.key);
     const totalFilled = categoryList.reduce((sum, p) => sum + (p.count || 1), 0);
     const currentMax = categories.find(c => c.label === activeTab)?.max || 16;
@@ -106,8 +105,35 @@ export default function QiXianPickleball() {
     }
   };
 
+  const handleEdit = async (p: Participant) => {
+    const code = window.prompt("請輸入 4 碼密碼以進行修改：");
+    if (code === p.edit_code) {
+      const newCountStr = window.prompt(`目前人數為 ${p.count} 位，請輸入新的人數 (1-4)：`, p.count.toString());
+      const newCount = parseInt(newCountStr || "");
+      
+      if (isNaN(newCount) || newCount < 1 || newCount > 4) {
+        alert("輸入無效，請輸入 1 到 4 之間的數字。");
+        return;
+      }
+
+      const { error } = await supabase
+        .from('tournament_participants')
+        .update({ count: newCount })
+        .eq('id', p.id);
+
+      if (!error) {
+        alert(`人數已成功修改為 ${newCount} 位！`);
+        fetchParticipants();
+      } else {
+        alert("修改失敗，請稍後再試。");
+      }
+    } else if (code !== null) {
+      alert("密碼錯誤！");
+    }
+  };
+
   const handleCancel = async (p: Participant) => {
-    const code = window.prompt("輸入 4 碼密碼取消：");
+    const code = window.prompt("請輸入 4 碼密碼取消所有報名：");
     if (code === p.edit_code) {
       if (window.confirm(`確定要取消「${p.name}」共 ${p.count} 位的報名嗎？`)) {
         await supabase.from('tournament_participants').delete().eq('id', p.id);
@@ -116,11 +142,8 @@ export default function QiXianPickleball() {
     } else if (code !== null) { alert("密碼錯誤！"); }
   };
 
-  // 計算邏輯
   const currentList = participants.filter(p => p.category === activeTab && p.day_key === selectedDay.key);
   const currentMax = categories.find(c => c.label === activeTab)?.max || 16;
-  
-  // 計算目前累積人數（用來判斷正備取）
   let runningTotal = 0;
 
   return (
@@ -132,18 +155,18 @@ export default function QiXianPickleball() {
             <h1 className="text-4xl md:text-5xl font-black text-emerald-400 italic tracking-widest uppercase">七賢國小匹克交流團</h1>
           </div>
           
-          <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-4 mb-6 inline-block">
-            <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 text-emerald-400 font-bold">
-              <span>🕒 時間：19:00 - 21:20</span>
-              <span>💰 費用：$100 / 人</span>
-              <span>🏸 租借球拍：$50 / 支</span>
-              <span className="text-orange-400">⚠️ 一人最多報 4 位</span>
+          <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-4 mb-6 inline-block text-emerald-400 font-bold">
+            <div className="flex flex-wrap justify-center gap-x-6 gap-y-2">
+              <span>🕒 19:00 - 21:20</span>
+              <span>💰 $100 / 人</span>
+              <span>🏸 拍子租借 $50</span>
+              <span className="text-orange-400">⚠️ 一人最高報 4 位</span>
             </div>
           </div>
 
           <div className="flex justify-center gap-3 flex-wrap">
             {dayOptions.map(d => (
-              <button key={d.key} onClick={() => setSelectedDay(d)} className={`px-5 py-3 rounded-2xl font-bold transition-all ${selectedDay.key === d.key ? 'bg-emerald-500 text-white shadow-lg' : 'bg-slate-800 text-slate-500'}`}>
+              <button key={d.key} onClick={() => setSelectedDay(d)} className={`px-5 py-3 rounded-2xl font-bold transition-all ${selectedDay.key === d.key ? 'bg-emerald-500 text-white shadow-lg' : 'bg-slate-800 text-slate-500 hover:bg-slate-700'}`}>
                 {d.label}
               </button>
             ))}
@@ -155,48 +178,39 @@ export default function QiXianPickleball() {
             <button key={cat.id} onClick={() => setActiveTab(cat.label)} className={`flex-1 py-10 px-4 rounded-[2rem] transition-all border-4 flex flex-col items-center justify-center ${activeTab === cat.label ? 'bg-slate-800 border-emerald-500 text-emerald-400 shadow-xl' : 'bg-slate-900 border-slate-800 text-slate-700'}`}>
               <span className="text-5xl font-black mb-3">{cat.label}</span>
               <span className="text-2xl font-black opacity-90">({cat.max}人)</span>
-              <span className="text-sm font-black uppercase tracking-widest mt-2">{cat.subLabel}</span>
             </button>
           ))}
         </div>
 
         <div className="grid md:grid-cols-5 gap-8">
-          <form onSubmit={handleRegister} className="md:col-span-2 bg-slate-800 p-8 rounded-[2.5rem] space-y-5 border border-slate-700 shadow-2xl">
-            <h2 className="font-bold text-2xl text-white">選手報名</h2>
+          <form onSubmit={handleRegister} className="md:col-span-2 bg-slate-800 p-8 rounded-[2.5rem] space-y-5 border border-slate-700 shadow-2xl h-fit">
+            <h2 className="font-bold text-2xl text-white">快速報名</h2>
             
             <div>
-              <label className="text-xs text-slate-500 ml-1">報名人數 Number of Players</label>
-              <select 
-                value={formData.count} 
-                onChange={e => setFormData({...formData, count: e.target.value})}
-                className="w-full bg-slate-900 p-5 rounded-2xl outline-none focus:ring-4 focus:ring-emerald-500/50 border border-slate-700 text-xl text-white appearance-none"
-              >
-                <option value="1">1 位</option>
-                <option value="2">2 位</option>
-                <option value="3">3 位</option>
-                <option value="4">4 位</option>
+              <label className="text-xs text-slate-500 ml-1 italic font-bold">1. 選擇人數</label>
+              <select value={formData.count} onChange={e => setFormData({...formData, count: e.target.value})} className="w-full bg-slate-900 p-5 rounded-2xl outline-none border border-slate-700 text-xl text-white appearance-none">
+                {[1,2,3,4].map(n => <option key={n} value={n}>{n} 位</option>)}
               </select>
             </div>
 
             <div>
-              <label className="text-xs text-slate-500 ml-1">代表姓名 Name</label>
-              <input type="text" required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} placeholder="請輸入姓名" className="w-full bg-slate-900 p-5 rounded-2xl outline-none focus:ring-4 focus:ring-emerald-500/50 border border-slate-700 text-xl text-white" />
+              <label className="text-xs text-slate-500 ml-1 italic font-bold">2. 代表姓名</label>
+              <input type="text" required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} placeholder="輸入名字" className="w-full bg-slate-900 p-5 rounded-2xl outline-none border border-slate-700 text-xl text-white" />
             </div>
             
             <div>
-              <label className="text-xs text-slate-500 ml-1">4 碼密碼 (取消用)</label>
-              <input type="password" maxLength={4} required value={formData.edit_code} onChange={e => setFormData({...formData, edit_code: e.target.value})} placeholder="設定密碼" className="w-full bg-slate-900 p-5 rounded-2xl outline-none focus:ring-4 focus:ring-emerald-500/50 border border-slate-700 text-xl text-white" />
+              <label className="text-xs text-slate-500 ml-1 italic font-bold">3. 密碼 (4 碼)</label>
+              <input type="password" maxLength={4} required value={formData.edit_code} onChange={e => setFormData({...formData, edit_code: e.target.value})} placeholder="修改取消用" className="w-full bg-slate-900 p-5 rounded-2xl outline-none border border-slate-700 text-xl text-white" />
             </div>
             
-            <button className="w-full bg-emerald-500 py-5 rounded-2xl font-black text-2xl hover:bg-emerald-400 transition-all text-white">確認送出</button>
+            <button className="w-full bg-emerald-500 py-5 rounded-2xl font-black text-2xl hover:bg-emerald-400 transition-all text-white shadow-lg">確認報名</button>
           </form>
 
           <div className="md:col-span-3">
             <div className="flex justify-between items-center mb-6 px-2">
-              <h2 className="font-bold text-2xl">目前清單</h2>
-              {/* 計算總人數 */}
-              <span className="bg-slate-800 px-4 py-2 rounded-full text-sm text-slate-400">
-                目前總計：{currentList.reduce((sum, p) => sum + (p.count || 1), 0)} / {currentMax} 人
+              <h2 className="font-bold text-2xl tracking-tighter">報名清單</h2>
+              <span className="bg-slate-800 px-4 py-2 rounded-full text-sm text-slate-400 font-bold">
+                已收：{currentList.reduce((sum, p) => sum + (p.count || 1), 0)} / {currentMax}
               </span>
             </div>
 
@@ -207,17 +221,22 @@ export default function QiXianPickleball() {
                 runningTotal += pCount;
                 
                 return (
-                  <div key={p.id} className="bg-slate-800/40 p-5 rounded-3xl flex justify-between items-center border border-slate-800">
+                  <div key={p.id} className="bg-slate-800/40 p-5 rounded-3xl flex justify-between items-center border border-slate-800 hover:border-slate-700 transition-all">
                     <div className="flex items-center gap-4">
-                      <span className={`text-xs font-black px-3 py-1 rounded-full ${isWaitlist ? 'bg-orange-500/10 text-orange-500' : 'bg-emerald-500/10 text-emerald-400'}`}>
-                        {isWaitlist ? '備取 Waiting' : '正取 No.'}
+                      <span className={`text-[10px] font-black px-2 py-1 rounded-md ${isWaitlist ? 'bg-orange-500/10 text-orange-500' : 'bg-emerald-500/10 text-emerald-400'}`}>
+                        {isWaitlist ? '備取' : '正取'}
                       </span>
                       <div className="flex flex-col">
                         <span className="font-bold text-xl">{p.name}</span>
-                        <span className="text-sm text-slate-500 font-bold">共 {pCount} 位</span>
+                        <span className="text-xs text-slate-500 font-bold tracking-widest">{pCount} 人</span>
                       </div>
                     </div>
-                    <button onClick={() => handleCancel(p)} className="text-sm text-slate-600 hover:text-red-400 px-3 py-1">取消</button>
+                    
+                    {/* 修改與取消按鈕 */}
+                    <div className="flex gap-2">
+                      <button onClick={() => handleEdit(p)} className="text-xs bg-slate-700 hover:bg-slate-600 text-slate-300 px-3 py-2 rounded-xl transition-all font-bold">修改</button>
+                      <button onClick={() => handleCancel(p)} className="text-xs bg-slate-900/50 hover:text-red-400 text-slate-600 px-3 py-2 rounded-xl transition-all font-bold">取消</button>
+                    </div>
                   </div>
                 );
               })}
