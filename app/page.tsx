@@ -11,35 +11,51 @@ type Participant = {
   id: number;
   name: string;
   category: string;
-  day: string; // 新增星期欄位
-  dupr: string;
+  day_key: string; // 用來存具體日期，例如 2024-05-13
   edit_code: string;
 };
 
 export default function QiXianSanda() {
-  const days = ["星期一", "星期四", "星期五"];
-  const [selectedDay, setSelectedDay] = useState("星期一");
+  // --- 📅 自動日期計算邏輯 ---
+  const getUpcomingDates = () => {
+    const now = new Date();
+    const dayOfWeek = now.getDay(); // 0是週日, 6是週六
+    
+    // 如果今天是週六(6)或週日(0)，就顯示下週的日期
+    const startOffset = (dayOfWeek === 6 || dayOfWeek === 0) ? 7 : 0;
+    
+    const getTargetDate = (targetDay: number) => {
+      const d = new Date();
+      // 先回到這週日，再加天數
+      d.setDate(now.getDate() - dayOfWeek + targetDay + startOffset);
+      return d;
+    };
 
-  // 🌟 自動根據星期判斷組別
-  const getCategories = (day: string) => {
-    if (day === "星期一") {
-      return [
-        { id: 'sanda', label: '散打區', max: 16 },
-        { id: 'newbie', label: '新手區', max: 8 },
-      ];
-    } else {
-      // 星期四、五保留原本的設計
-      return [
-        { id: 'sanda', label: '散打區', max: 16 },
-        { id: 'newbie', label: '新手區', max: 8 },
-        { id: 'trial', label: '新手體驗', max: 4 }, // 假設原本是 4 人，您可以自行調整
-      ];
-    }
+    const mon = getTargetDate(1);
+    const thu = getTargetDate(4);
+    const fri = getTargetDate(5);
+
+    const format = (d: Date) => `${d.getMonth() + 1}/${d.getDate()}`;
+    const formatKey = (d: Date) => `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+
+    return [
+      { label: `週一 (${format(mon)})`, key: formatKey(mon) },
+      { label: `週四 (${format(thu)})`, key: formatKey(thu) },
+      { label: `週五 (${format(fri)})`, key: formatKey(fri) },
+    ];
   };
 
-  const categories = getCategories(selectedDay);
+  const dayOptions = getUpcomingDates();
+  const [selectedDay, setSelectedDay] = useState(dayOptions[0]);
+
+  // 固定組別
+  const categories = [
+    { id: 'sanda', label: '散打區', max: 16 },
+    { id: 'newbie', label: '新手區', max: 8 },
+  ];
+
   const [activeTab, setActiveTab] = useState(categories[0].label);
-  const [formData, setFormData] = useState({ name: '', dupr: '', edit_code: '' });
+  const [formData, setFormData] = useState({ name: '', edit_code: '' });
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -47,11 +63,6 @@ export default function QiXianSanda() {
     document.title = "七賢匹克球團報名系統";
     fetchParticipants();
   }, []);
-
-  // 當切換星期時，自動把組別跳回第一個，避免選到消失的組別
-  useEffect(() => {
-    setActiveTab(categories[0].label);
-  }, [selectedDay]);
 
   const fetchParticipants = async () => {
     setIsLoading(true);
@@ -65,11 +76,11 @@ export default function QiXianSanda() {
     if (formData.edit_code.length !== 4) { alert("請設定 4 位數取消密碼"); return; }
 
     const isDuplicate = participants.some(p => 
-      p.name.trim() === formData.name.trim() && p.category === activeTab && p.day === selectedDay
+      p.name.trim() === formData.name.trim() && p.category === activeTab && p.day_key === selectedDay.key
     );
     if (isDuplicate) { alert(`「${formData.name}」已經在名單中囉！`); return; }
 
-    const categoryList = participants.filter(p => p.category === activeTab && p.day === selectedDay);
+    const categoryList = participants.filter(p => p.category === activeTab && p.day_key === selectedDay.key);
     const currentMax = categories.find(c => c.label === activeTab)?.max || 16;
 
     if (categoryList.length >= currentMax) {
@@ -79,17 +90,16 @@ export default function QiXianSanda() {
     const { error } = await supabase.from('tournament_participants').insert([{
       name: formData.name.trim(),
       category: activeTab,
-      day: selectedDay,
-      dupr: formData.dupr || '0',
+      day_key: selectedDay.key, // 存入具體日期 key
       edit_code: formData.edit_code
     }]);
 
     if (!error) {
       alert("報名成功！");
-      setFormData({ name: '', dupr: '', edit_code: '' });
+      setFormData({ name: '', edit_code: '' });
       fetchParticipants();
     } else {
-      alert("失敗：" + error.message);
+      alert("報名失敗：" + error.message);
     }
   };
 
@@ -103,7 +113,7 @@ export default function QiXianSanda() {
     } else if (code !== null) { alert("密碼錯誤！"); }
   };
 
-  const currentList = participants.filter(p => p.category === activeTab && p.day === selectedDay);
+  const currentList = participants.filter(p => p.category === activeTab && p.day_key === selectedDay.key);
   const currentMax = categories.find(c => c.label === activeTab)?.max || 16;
 
   return (
@@ -111,10 +121,11 @@ export default function QiXianSanda() {
       <div className="max-w-3xl mx-auto">
         <header className="text-center mb-8">
           <h1 className="text-3xl font-black text-emerald-400 mb-2">七賢匹克球團 報名系統</h1>
-          <div className="flex justify-center gap-4 mt-4">
-            {days.map(d => (
-              <button key={d} onClick={() => setSelectedDay(d)} className={`px-4 py-2 rounded-lg font-bold transition-all ${selectedDay === d ? 'bg-white text-slate-900' : 'bg-slate-800 text-slate-500'}`}>
-                {d}
+          <p className="text-slate-500 text-sm mb-4">每週六自動更新日期</p>
+          <div className="flex justify-center gap-2 mt-4 flex-wrap">
+            {dayOptions.map(d => (
+              <button key={d.key} onClick={() => setSelectedDay(d)} className={`px-4 py-2 rounded-lg font-bold transition-all ${selectedDay.key === d.key ? 'bg-white text-slate-900 shadow-lg' : 'bg-slate-800 text-slate-500'}`}>
+                {d.label}
               </button>
             ))}
           </div>
@@ -122,36 +133,39 @@ export default function QiXianSanda() {
 
         <div className="flex gap-2 mb-6">
           {categories.map(cat => (
-            <button key={cat.id} onClick={() => setActiveTab(cat.label)} className={`flex-1 py-3 rounded-xl font-bold transition-all ${activeTab === cat.label ? 'bg-emerald-500 shadow-lg' : 'bg-slate-800 text-slate-500'}`}>
-              {cat.label} ({cat.max}人)
+            <button key={cat.id} onClick={() => setActiveTab(cat.label)} className={`flex-1 py-3 rounded-xl font-bold transition-all ${activeTab === cat.label ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/30' : 'bg-slate-800 text-slate-500'}`}>
+              {cat.label} (上限 {cat.max})
             </button>
           ))}
         </div>
 
         <div className="grid md:grid-cols-5 gap-6">
-          <form onSubmit={handleRegister} className="md:col-span-2 bg-slate-800 p-5 rounded-2xl h-fit space-y-4">
-            <h2 className="font-bold border-l-4 border-emerald-500 pl-2">{selectedDay} 報名表</h2>
+          <form onSubmit={handleRegister} className="md:col-span-2 bg-slate-800 p-6 rounded-2xl h-fit space-y-4 border border-slate-700">
+            <h2 className="font-bold border-l-4 border-emerald-500 pl-2">{selectedDay.label} 報名</h2>
             <input type="text" required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} placeholder="選手姓名" className="w-full bg-slate-900 p-3 rounded-lg outline-none focus:ring-2 focus:ring-emerald-500" />
-            <input type="text" value={formData.dupr} onChange={e => setFormData({...formData, dupr: e.target.value})} placeholder="DUPR ID (選填)" className="w-full bg-slate-900 p-3 rounded-lg outline-none focus:ring-2 focus:ring-emerald-500" />
             <input type="password" maxLength={4} required value={formData.edit_code} onChange={e => setFormData({...formData, edit_code: e.target.value})} placeholder="4 碼取消密碼" className="w-full bg-slate-900 p-3 rounded-lg outline-none focus:ring-2 focus:ring-emerald-500" />
-            <button className="w-full bg-emerald-500 py-3 rounded-lg font-bold hover:bg-emerald-400 transition-colors">確認報名</button>
+            <button className="w-full bg-emerald-500 py-4 rounded-xl font-black text-lg hover:bg-emerald-400 shadow-lg transition-all">確認報名</button>
           </form>
 
           <div className="md:col-span-3">
-            <h2 className="font-bold mb-4 border-l-4 border-emerald-500 pl-2">目前名單 (剩餘正取：{Math.max(0, currentMax - currentList.length)})</h2>
+            <div className="flex justify-between items-end mb-4">
+              <h2 className="font-bold border-l-4 border-emerald-500 pl-2">報名清單</h2>
+              <span className="text-xs text-slate-400">剩餘正取：{Math.max(0, currentMax - currentList.length)}</span>
+            </div>
+
             <div className="space-y-2">
               {currentList.map((p, i) => (
-                <div key={p.id} className="bg-slate-800 p-3 rounded-xl flex justify-between items-center">
+                <div key={p.id} className="bg-slate-800 p-4 rounded-xl flex justify-between items-center border border-slate-700">
                   <div className="flex items-center gap-3">
-                    <span className={`text-[10px] px-1 rounded ${i >= currentMax ? 'bg-orange-500/20 text-orange-400' : 'bg-emerald-500/20 text-emerald-400'}`}>{i >= currentMax ? '備取' : '正取'}</span>
-                    <div>
-                      <div className="font-bold">{p.name}</div>
-                      <div className="text-[10px] text-slate-500">DUPR: {p.dupr}</div>
-                    </div>
+                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${i >= currentMax ? 'bg-orange-500/20 text-orange-400' : 'bg-emerald-500/20 text-emerald-400'}`}>
+                      {i >= currentMax ? '備取' : '正取'}
+                    </span>
+                    <span className="font-bold text-lg">{p.name}</span>
                   </div>
                   <button onClick={() => handleCancel(p)} className="text-xs text-slate-600 hover:text-red-400">取消</button>
                 </div>
               ))}
+              {currentList.length === 0 && <div className="text-center py-10 text-slate-500 bg-slate-800/30 rounded-xl border border-dashed border-slate-700">目前尚無人報名</div>}
             </div>
           </div>
         </div>
