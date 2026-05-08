@@ -180,7 +180,8 @@ export default function QiXianPickleball() {
               <input type="text" required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} placeholder="輸入名字" className="w-full bg-slate-900 p-6 rounded-2xl outline-none border border-slate-700 text-2xl font-black text-white mt-2" />
             </div>
             <div>
-              <label className="text-sm text-slate-500 ml-1 font-black uppercase tracking-widest">3. 密碼 (4 碼)</label>
+              {/* 🌟 放大 1.5 倍且改為黃色的密碼提示詞 🌟 */}
+              <label className="text-xl text-yellow-400 ml-1 font-black uppercase tracking-widest">3. 密碼 (4 碼)</label>
               <input type="password" maxLength={4} required value={formData.edit_code} onChange={e => setFormData({...formData, edit_code: e.target.value})} placeholder="修改取消用" className="w-full bg-slate-900 p-6 rounded-2xl outline-none border border-slate-700 text-2xl font-black text-white mt-2" />
             </div>
             <button className="w-full bg-emerald-500 py-6 rounded-2xl font-black text-3xl hover:bg-emerald-400 shadow-xl text-white transition-all active:scale-95">確認報名</button>
@@ -203,18 +204,15 @@ export default function QiXianPickleball() {
                 return (
                   <div key={p.id} className="bg-slate-800/60 p-5 rounded-[2rem] flex flex-col sm:flex-row justify-between items-center border-2 border-slate-800 hover:border-emerald-500/50 transition-all gap-4">
                     <div className="flex items-center gap-6 w-full sm:w-auto">
-                      {/* 🌟 狀態標籤 */}
                       <span className={`text-xl font-black px-5 py-2 rounded-xl shrink-0 w-24 text-center ${isWaitlist ? 'bg-orange-500 text-white' : 'bg-emerald-500 text-white'}`}>
                         {isWaitlist ? '備取' : '正取'}
                       </span>
-                      {/* 🌟 名字與人數橫式並排 */}
                       <div className="flex items-baseline gap-4">
                         <span className="font-black text-4xl text-white tracking-tight">{p.name}</span>
                         <span className="text-2xl text-emerald-400 font-black">{pCount}位</span>
                       </div>
                     </div>
                     
-                    {/* 🌟 修改與取消按鈕：尺寸調整為與狀態標籤一致 */}
                     <div className="flex gap-2 w-full sm:w-auto">
                       <button onClick={() => handleEdit(p)} className="flex-1 sm:flex-none text-xl bg-slate-700 hover:bg-emerald-600 text-white px-5 py-2 rounded-xl transition-all font-black w-24">修改</button>
                       <button onClick={() => handleCancel(p)} className="flex-1 sm:flex-none text-xl bg-red-900/30 hover:bg-red-600 text-red-500 hover:text-white px-5 py-2 rounded-xl transition-all font-black border-2 border-red-900/50 w-24">取消</button>
