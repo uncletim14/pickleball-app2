@@ -15,38 +15,55 @@ type Participant = {
   day_key: string;
   edit_code: string;
   count: number;
-  status: string; 
 };
 
 export default function QiXianPickleball() {
+  const [now, setNow] = useState(new Date());
+
+  // 定期更新時間，確保開關精準
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 60000);
+    return () => clearInterval(timer);
+  }, []);
+
   const getUpcomingDates = () => {
-    const now = new Date();
     const dayOfWeek = now.getDay();
-    const startOffset = (dayOfWeek === 6 && now.getHours() >= 18) || dayOfWeek === 0 ? 7 : 0;
+    // 判斷是否已經過了週六 18:00 (開放下週報名的時間點)
+    const isAfterOpening = (dayOfWeek === 6 && now.getHours() >= 18) || dayOfWeek === 0;
+    const startOffset = isAfterOpening ? 7 : 0;
+
     const getTargetDate = (targetDay: number) => {
-      const d = new Date();
+      const d = new Date(now);
       d.setDate(now.getDate() - dayOfWeek + targetDay + startOffset);
+      d.setHours(0, 0, 0, 0);
       return d;
     };
+
     const mon = getTargetDate(1);
     const thu = getTargetDate(4);
     const fri = getTargetDate(5);
+
     const format = (d: Date) => `${d.getMonth() + 1}/${d.getDate()}`;
     const formatKey = (d: Date) => `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+
     return [
-      { label: `週一 (${format(mon)})`, key: formatKey(mon), type: 'normal' },
-      { label: `週四 (${format(thu)})`, key: formatKey(thu), type: 'thu_special' },
-      { label: `週五 (${format(fri)})`, key: formatKey(fri), type: 'normal' },
+      { label: `週一 (${format(mon)})`, key: formatKey(mon), dateObj: mon, type: 'normal' },
+      { label: `週四 (${format(thu)})`, key: formatKey(thu), dateObj: thu, type: 'thu_special' },
+      { label: `週五 (${format(fri)})`, key: formatKey(fri), dateObj: fri, type: 'normal' },
     ];
   };
 
   const dayOptions = getUpcomingDates();
   const [selectedDay, setSelectedDay] = useState(dayOptions[0]);
 
+  // 判斷當前選擇的場次是否可以報名
+  // 1. 日期還沒過 (當前時間 < 場次日期隔天凌晨)
+  // 2. 必須是在週六 18:00 之後 (針對未來的日期)
+  const isExpired = now.getTime() > selectedDay.dateObj.getTime() + 86400000;
+  const isRegistrationOpen = (now.getDay() === 6 && now.getHours() >= 18) || now.getDay() === 0 || now.getDay() >= 1 && now.getDay() <= 5;
+
   const getCategories = (dayType: string) => {
-    if (dayType === 'thu_special') {
-      return [{ id: 'sanda', label: '散打區', subLabel: 'OPEN PLAY', max: 24 }];
-    }
+    if (dayType === 'thu_special') return [{ id: 'sanda', label: '散打區', subLabel: 'OPEN PLAY', max: 24 }];
     return [
       { id: 'sanda', label: '散打區', subLabel: 'OPEN PLAY', max: 16 },
       { id: 'newbie', label: '新手區', subLabel: 'BEGINNER FRIENDLY', max: 8 },
@@ -65,116 +82,64 @@ export default function QiXianPickleball() {
 
   const fetchParticipants = async () => {
     const { data, error } = await supabase.from('tournament_participants').select('*').order('id', { ascending: true });
-    if (!error && data) {
-      setParticipants(data);
-    }
-  };
-
-  // 🌟 核心功能：自動遞補邏輯
-  const autoRecheckStatus = async (updatedList: Participant[]) => {
-    const currentMax = categories.find(c => c.label === activeTab)?.max || 16;
-    let runningTotal = 0;
-    
-    // 過濾出當前日期與組別的所有人，並按 ID 排序（確保排隊順序不變）
-    const targetGroup = updatedList
-      .filter(p => p.category === activeTab && p.day_key === selectedDay.key)
-      .sort((a, b) => a.id - b.id);
-
-    for (const p of targetGroup) {
-      let expectedStatus = '正取';
-      if (runningTotal + p.count > currentMax) {
-        expectedStatus = '備取';
-      } else {
-        runningTotal += p.count;
-      }
-
-      // 如果當前狀態與預期不符（例如本來是備取，現在可以變正取），就更新資料庫
-      if (p.status !== expectedStatus) {
-        await supabase.from('tournament_participants').update({ status: expectedStatus }).eq('id', p.id);
-      }
-    }
-    fetchParticipants();
+    if (!error && data) setParticipants(data);
   };
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isRegistrationOpen) { alert("報名尚未開放！每週六 18:00 開放。"); return; }
+    if (isExpired) { alert("該場次已結束，無法報名。"); return; }
+
     const regCount = parseInt(formData.count);
+    const trimmedName = formData.name.trim();
     if (formData.edit_code.length !== 4) { alert("請設定 4 位數取消密碼"); return; }
     
-    const currentGroup = participants.filter(p => p.category === activeTab && p.day_key === selectedDay.key);
-    const totalFilled = currentGroup.filter(p => p.status === '正取').reduce((sum, p) => sum + (p.count || 0), 0);
-    const currentMax = categories.find(c => c.label === activeTab)?.max || 16;
-
-    let finalStatus = '正取';
-    if ((totalFilled + regCount) > currentMax) {
-      if (!window.confirm("正取名額不足，將全數轉為【備取】，確定嗎？")) return;
-      finalStatus = '備取'; 
-    }
+    const isDuplicate = participants.some(p => p.day_key === selectedDay.key && p.category === activeTab && p.name.toLowerCase() === trimmedName.toLowerCase());
+    if (isDuplicate) { alert(`「${trimmedName}」已報名過此場次！`); return; }
 
     const { error } = await supabase.from('tournament_participants').insert([{
-      name: formData.name.trim(),
-      category: activeTab,
-      day_key: selectedDay.key,
-      edit_code: formData.edit_code,
-      count: regCount,
-      status: finalStatus 
+      name: trimmedName, category: activeTab, day_key: selectedDay.key, edit_code: formData.edit_code, count: regCount
     }]);
 
     if (!error) {
       setFormData({ name: '', edit_code: '', count: '1' });
       fetchParticipants();
+      alert("報名完成！");
     }
   };
 
-  const handleEdit = async (p: Participant) => {
-    const code = window.prompt("請輸入 4 碼密碼以進行修改：");
-    if (code === p.edit_code) {
-      const newCountStr = window.prompt(`目前人數為 ${p.count} 位，請輸入新的人數 (1-4)：`, p.count.toString());
-      const newCount = parseInt(newCountStr || "");
-      if (isNaN(newCount) || newCount < 1 || newCount > 4) return;
-
-      const { error } = await supabase.from('tournament_participants').update({ count: newCount }).eq('id', p.id);
-      if (!error) {
-        // 修改完人數後，立刻觸發「全體重新檢查狀態」，實現自動遞補
-        const { data: freshData } = await supabase.from('tournament_participants').select('*');
-        if (freshData) await autoRecheckStatus(freshData);
-        alert("人數已修改，系統已重新調整正備取狀態！");
-      }
-    } else if (code !== null) { alert("密碼錯誤！"); }
-  };
-
-  const handleCancel = async (p: Participant) => {
-    const code = window.prompt("請輸入 4 碼密碼取消報名：");
-    if (code === p.edit_code) {
-      if (window.confirm(`確定要取消報名嗎？`)) {
-        const { error } = await supabase.from('tournament_participants').delete().eq('id', p.id);
-        if (!error) {
-          // 取消完畢後，立刻觸發遞補檢查
-          const { data: freshData } = await supabase.from('tournament_participants').select('*');
-          if (freshData) await autoRecheckStatus(freshData);
-        }
-      }
-    } else if (code !== null) { alert("密碼錯誤！"); }
-  };
-
-  const currentList = participants.filter(p => p.category === activeTab && p.day_key === selectedDay.key);
+  // 排序與狀態判定邏輯
+  const currentGroup = participants.filter(p => p.category === activeTab && p.day_key === selectedDay.key);
   const currentMax = categories.find(c => c.label === activeTab)?.max || 16;
-  const confirmedCount = currentList.filter(p => p.status === '正取').reduce((sum, p) => sum + (p.count || 0), 0);
+  let runningTotal = 0;
+  let hasMetWaitlist = false; 
+  const listWithStatus = currentGroup.map(p => {
+    if (hasMetWaitlist || (runningTotal + p.count > currentMax)) {
+      hasMetWaitlist = true; 
+      return { ...p, status: '備取' };
+    } else {
+      runningTotal += p.count;
+      return { ...p, status: '正取' };
+    }
+  });
+  const confirmedTotal = listWithStatus.filter(p => p.status === '正取').reduce((sum, p) => sum + p.count, 0);
 
   return (
     <main className="min-h-screen bg-slate-900 p-4 md:p-8 text-slate-100 font-sans tracking-tight">
       <div className="max-w-5xl mx-auto">
         <header className="text-center mb-10">
-          <div className="flex flex-col md:flex-row items-center justify-center gap-6 mb-6">
-            <Image src="/七賢LOGO.png" alt="LOGO" width={100} height={100} className="rounded-full shadow-2xl" />
-            <h1 className="text-5xl md:text-6xl font-black text-emerald-400 italic tracking-widest uppercase">七賢國小匹克交流團</h1>
+          <div className="flex flex-col md:flex-row items-center justify-center gap-6 mb-4">
+            <Image src="/七賢LOGO.png" alt="LOGO" width={80} height={80} className="rounded-full shadow-2xl" />
+            <h1 className="text-4xl md:text-6xl font-black text-emerald-400 italic tracking-widest uppercase">七賢國小匹克交流團</h1>
           </div>
-          <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-6 mb-8 inline-block text-2xl font-bold">
-            <div className="flex flex-wrap justify-center gap-x-10 gap-y-3 text-emerald-400">
-              <span>🕒 19:00 - 21:20</span> <span>💰 $100 / 人</span> <span>🏸 拍子租借 $50</span>
-              <span className="text-orange-400">⚠️ 一人最高報 4 位</span>
-            </div>
+          
+          {/* 🌟 報名開放時間提示訊息 */}
+          <div className="mb-6">
+            <span className="bg-orange-500/20 text-orange-400 border border-orange-500/40 px-4 py-2 rounded-full text-lg font-bold">
+              📢 系統公告：每週六晚上 18:00 開放下一週報名
+            </span>
           </div>
+
           <div className="flex justify-center gap-4 flex-wrap">
             {dayOptions.map(d => (
               <button key={d.key} onClick={() => setSelectedDay(d)} className={`px-6 py-4 rounded-2xl font-black text-xl transition-all ${selectedDay.key === d.key ? 'bg-emerald-500 text-white shadow-xl' : 'bg-slate-800 text-slate-500 hover:bg-slate-700'}`}>{d.label}</button>
@@ -182,44 +147,61 @@ export default function QiXianPickleball() {
           </div>
         </header>
 
-        <div className="flex gap-6 mb-12">
+        <div className="flex gap-4 mb-10">
           {categories.map(cat => (
-            <button key={cat.id} onClick={() => setActiveTab(cat.label)} className={`flex-1 py-12 px-6 rounded-[3rem] transition-all border-4 flex flex-col items-center justify-center ${activeTab === cat.label ? 'bg-slate-800 border-emerald-500 text-emerald-400 shadow-xl' : 'bg-slate-900 border-slate-800 text-slate-700'}`}>
-              <span className="text-6xl font-black mb-4">{cat.label}</span>
-              <span className="text-3xl font-black opacity-90">({cat.max}人)</span>
+            <button key={cat.id} onClick={() => setActiveTab(cat.label)} className={`flex-1 py-8 px-4 rounded-[2rem] transition-all border-4 flex flex-col items-center justify-center ${activeTab === cat.label ? 'bg-slate-800 border-emerald-500 text-emerald-400 shadow-xl' : 'bg-slate-900 border-slate-800 text-slate-700'}`}>
+              <span className="text-4xl font-black mb-2">{cat.label}</span>
+              <span className="text-xl font-black opacity-90">({cat.max}人)</span>
             </button>
           ))}
         </div>
 
         <div className="grid lg:grid-cols-5 gap-10">
-          <form onSubmit={handleRegister} className="lg:col-span-2 bg-slate-800 p-10 rounded-[3rem] space-y-6 border border-slate-700 shadow-2xl h-fit">
-            <h2 className="font-black text-3xl text-white mb-4 italic">快速報名</h2>
-            <div>
-              <label className="text-sm text-slate-500 font-black uppercase tracking-widest">1. 選擇人數</label>
-              <select value={formData.count} onChange={e => setFormData({...formData, count: e.target.value})} className="w-full bg-slate-900 p-6 rounded-2xl border border-slate-700 text-2xl font-black text-white appearance-none mt-2">
-                {[1,2,3,4].map(n => <option key={n} value={n}>{n} 位</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="text-sm text-slate-500 font-black uppercase tracking-widest">2. 代表姓名</label>
-              <input type="text" required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} placeholder="輸入名字" className="w-full bg-slate-900 p-6 rounded-2xl border border-slate-700 text-2xl font-black text-white mt-2" />
-            </div>
-            <div>
-              <label className="text-xl text-yellow-400 font-black uppercase tracking-widest">3. 密碼 (4 碼)</label>
-              <input type="password" maxLength={4} required value={formData.edit_code} onChange={e => setFormData({...formData, edit_code: e.target.value})} placeholder="修改取消用" className="w-full bg-slate-900 p-6 rounded-2xl border border-slate-700 text-2xl font-black text-white mt-2" />
-            </div>
-            <button className="w-full bg-emerald-500 py-6 rounded-2xl font-black text-3xl hover:bg-emerald-400 text-white transition-all active:scale-95">確認報名</button>
-          </form>
+          <div className="lg:col-span-2">
+            {/* 🌟 根據狀態顯示報名表或關閉提示 */}
+            {!isRegistrationOpen ? (
+              <div className="bg-slate-800/50 p-10 rounded-[3rem] border border-slate-700 text-center">
+                <p className="text-2xl font-bold text-slate-400 italic">尚未開放報名</p>
+                <p className="text-slate-500 mt-2">請於週六 18:00 後再來</p>
+              </div>
+            ) : isExpired ? (
+              <div className="bg-red-900/10 p-10 rounded-[3rem] border border-red-900/30 text-center">
+                <p className="text-2xl font-bold text-red-400 italic">場次已結束</p>
+                <p className="text-red-500/70 mt-2">無法再進行報名</p>
+              </div>
+            ) : (
+              <form onSubmit={handleRegister} className="bg-slate-800 p-10 rounded-[3rem] space-y-6 border border-slate-700 shadow-2xl">
+                <h2 className="font-black text-3xl text-white mb-4 italic uppercase">報名表單</h2>
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-sm text-slate-500 font-black tracking-widest uppercase">1. 人數</label>
+                    <select value={formData.count} onChange={e => setFormData({...formData, count: e.target.value})} className="w-full bg-slate-900 p-6 rounded-2xl border border-slate-700 text-2xl font-black text-white appearance-none mt-2">
+                      {[1,2,3,4].map(n => <option key={n} value={n}>{n} 位</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-sm text-slate-500 font-black tracking-widest uppercase">2. 姓名</label>
+                    <input type="text" required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} placeholder="輸入姓名" className="w-full bg-slate-900 p-6 rounded-2xl border border-slate-700 text-2xl font-black text-white mt-2" />
+                  </div>
+                  <div>
+                    <label className="text-sm text-yellow-400 font-black tracking-widest uppercase">3. 密碼 (4 碼)</label>
+                    <input type="password" maxLength={4} required value={formData.edit_code} onChange={e => setFormData({...formData, edit_code: e.target.value})} placeholder="修改取消用" className="w-full bg-slate-900 p-6 rounded-2xl border border-slate-700 text-2xl font-black text-white mt-2" />
+                  </div>
+                  <button className="w-full bg-emerald-500 py-6 rounded-2xl font-black text-3xl hover:bg-emerald-400 text-white transition-all active:scale-95 shadow-lg">確認報名</button>
+                </div>
+              </form>
+            )}
+          </div>
 
           <div className="lg:col-span-3">
             <div className="flex justify-between items-center mb-8 px-4">
               <h2 className="font-black text-4xl italic tracking-tighter">報名清單</h2>
-              <span className="bg-slate-800 px-6 py-3 rounded-full text-xl text-slate-400 font-black">
-                {confirmedCount} / {currentMax}
+              <span className="bg-slate-800 px-6 py-3 rounded-full text-xl text-slate-400 font-black uppercase">
+                正取：{confirmedTotal} / {currentMax}
               </span>
             </div>
             <div className="space-y-4">
-              {currentList.map((p) => (
+              {listWithStatus.map((p) => (
                 <div key={p.id} className="bg-slate-800/60 p-5 rounded-[2rem] flex flex-col sm:flex-row justify-between items-center border-2 border-slate-800 hover:border-emerald-500/50 transition-all gap-4 shadow-xl">
                   <div className="flex items-center gap-6 w-full sm:w-auto">
                     <span className={`text-xl font-black px-5 py-2 rounded-xl shrink-0 w-24 text-center ${ p.status === '備取' ? 'bg-orange-500 text-white' : 'bg-emerald-500 text-white'}`}>
@@ -231,12 +213,21 @@ export default function QiXianPickleball() {
                     </div>
                   </div>
                   <div className="flex gap-2 w-full sm:w-auto">
-                    <button onClick={() => handleEdit(p)} className="text-xl bg-slate-700 text-white px-5 py-2 rounded-xl font-black w-24">修改</button>
-                    <button onClick={() => handleCancel(p)} className="text-xl bg-red-900/30 text-red-500 px-5 py-2 rounded-xl font-black border-2 border-red-900/50 w-24">取消</button>
+                    <button disabled={isExpired} onClick={() => {
+                        const code = window.prompt("請輸入密碼：");
+                        if (code === p.edit_code) {
+                          const newCount = parseInt(window.prompt("新人數 (1-4)：", p.count.toString()) || "");
+                          if (!isNaN(newCount)) supabase.from('tournament_participants').update({ count: newCount }).eq('id', p.id).then(() => fetchParticipants());
+                        } else if (code) alert("錯誤！");
+                    }} className={`text-xl px-5 py-2 rounded-xl font-black w-24 ${isExpired ? 'bg-slate-800 text-slate-600' : 'bg-slate-700 text-white'}`}>修改</button>
+                    <button disabled={isExpired} onClick={() => {
+                        const code = window.prompt("請輸入密碼：");
+                        if (code === p.edit_code && window.confirm("確定取消？")) supabase.from('tournament_participants').delete().eq('id', p.id).then(() => fetchParticipants());
+                    }} className={`text-xl px-5 py-2 rounded-xl font-black border-2 w-24 ${isExpired ? 'border-slate-800 text-slate-600' : 'border-red-900/50 text-red-500 bg-red-900/30'}`}>取消</button>
                   </div>
                 </div>
               ))}
-              {currentList.length === 0 && <div className="text-center py-24 text-slate-700 font-black text-3xl italic">目前尚無人報名</div>}
+              {listWithStatus.length === 0 && <div className="text-center py-24 text-slate-700 font-black text-3xl italic">目前無人報名</div>}
             </div>
           </div>
         </div>
