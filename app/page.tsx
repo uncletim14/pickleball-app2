@@ -105,6 +105,7 @@ export default function QiXianPickleball() {
 
   const currentGroup = participants.filter(p => p.category === activeTab && p.day_key === selectedDay.key);
   const currentMax = categories.find(c => c.label === activeTab)?.max || 16;
+  
   let runningTotal = 0;
   let hasMetWaitlist = false; 
   const listWithStatus = currentGroup.map(p => {
@@ -127,9 +128,9 @@ export default function QiXianPickleball() {
             <h1 className="text-4xl md:text-6xl font-black text-emerald-400 italic tracking-widest uppercase">七賢國小匹克交流團</h1>
           </div>
           
-          {/* 🌟 找回來的關鍵資訊欄位 */}
-          <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-6 mb-8 inline-block shadow-lg">
-            <div className="text-2xl md:text-3xl font-black text-emerald-400 flex flex-wrap justify-center gap-x-8 gap-y-2">
+          {/* 🌟 調整字體大小與公告一致的資訊區塊 */}
+          <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-full px-8 py-3 mb-4 inline-block shadow-lg">
+            <div className="text-lg font-bold text-emerald-400 flex flex-wrap justify-center gap-x-8 gap-y-2">
               <span>🕒 19:00 - 21:20</span>
               <span>💰 $100 / 人</span>
               <span>🏸 拍子租借 $50</span>
@@ -137,7 +138,7 @@ export default function QiXianPickleball() {
           </div>
 
           <div className="mb-8">
-            <span className="bg-orange-500/20 text-orange-400 border border-orange-500/40 px-4 py-2 rounded-full text-lg font-bold">
+            <span className="bg-orange-500/20 text-orange-400 border border-orange-500/40 px-6 py-2 rounded-full text-lg font-bold">
               📢 每週六晚上 18:00 開放下一週報名
             </span>
           </div>
