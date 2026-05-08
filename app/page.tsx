@@ -46,11 +46,11 @@ export default function QiXianPickleball() {
 
   const getCategories = (dayType: string) => {
     if (dayType === 'thu_special') {
-      return [{ id: 'sanda', label: '散打區', subLabel: 'Open Play', max: 24 }];
+      return [{ id: 'sanda', label: '散打區', subLabel: 'OPEN PLAY', max: 24 }];
     }
     return [
-      { id: 'sanda', label: '散打區', subLabel: 'Open Play', max: 16 },
-      { id: 'newbie', label: '新手區', subLabel: 'Beginner Friendly', max: 8 },
+      { id: 'sanda', label: '散打區', subLabel: 'OPEN PLAY', max: 16 },
+      { id: 'newbie', label: '新手區', subLabel: 'BEGINNER FRIENDLY', max: 8 },
     ];
   };
 
@@ -91,8 +91,8 @@ export default function QiXianPickleball() {
   };
 
   const handleCancel = async (p: Participant) => {
-    const code = window.prompt("輸入 4 碼密碼取消：");
-    if (code === p.edit_code) { if (window.confirm("確定取消？")) { await supabase.from('tournament_participants').delete().eq('id', p.id); fetchParticipants(); } }
+    const code = window.prompt("輸入 4 碼密碼取消報名：");
+    if (code === p.edit_code) { if (window.confirm("確定取消報名嗎？")) { await supabase.from('tournament_participants').delete().eq('id', p.id); fetchParticipants(); } }
     else if (code !== null) { alert("密碼錯誤！"); }
   };
 
@@ -101,63 +101,69 @@ export default function QiXianPickleball() {
 
   return (
     <main className="min-h-screen bg-slate-900 p-4 md:p-8 text-slate-100 font-sans tracking-tight">
-      <div className="max-w-3xl mx-auto">
-        <header className="text-center mb-8">
-          <h1 className="text-3xl md:text-4xl font-black text-emerald-400 mb-2 italic tracking-widest uppercase">
+      <div className="max-w-4xl mx-auto">
+        <header className="text-center mb-10">
+          <h1 className="text-4xl md:text-5xl font-black text-emerald-400 mb-3 italic tracking-widest uppercase">
             七賢國小匹克交流團
           </h1>
-          <p className="text-slate-500 text-sm mb-4 italic font-bold">每週六 18:00 自動更新下週日期</p>
-          <div className="flex justify-center gap-2 flex-wrap">
+          <p className="text-slate-500 text-sm mb-6 font-bold">每週六 18:00 自動更新下週日期</p>
+          <div className="flex justify-center gap-3 flex-wrap">
             {dayOptions.map(d => (
-              <button key={d.key} onClick={() => setSelectedDay(d)} className={`px-4 py-2 rounded-xl font-bold transition-all ${selectedDay.key === d.key ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'bg-slate-800 text-slate-500 hover:text-slate-300'}`}>
+              <button key={d.key} onClick={() => setSelectedDay(d)} className={`px-5 py-3 rounded-2xl font-bold transition-all ${selectedDay.key === d.key ? 'bg-emerald-500 text-white shadow-[0_0_20px_rgba(16,185,129,0.4)]' : 'bg-slate-800 text-slate-500 hover:text-slate-300'}`}>
                 {d.label}
               </button>
             ))}
           </div>
         </header>
 
-        {/* 🌟 這裡已將字體放大為 text-2xl 並加厚字體 */}
-        <div className="flex gap-3 mb-8">
+        {/* 🌟 核心按鈕：字體放大兩倍，整體高度與寬度也同步提升 🌟 */}
+        <div className="flex gap-4 mb-12">
           {categories.map(cat => (
             <button 
               key={cat.id} 
               onClick={() => setActiveTab(cat.label)} 
-              className={`flex-1 py-6 px-2 rounded-2xl transition-all border-2 flex flex-col items-center justify-center ${activeTab === cat.label ? 'bg-slate-800 border-emerald-500 text-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.2)]' : 'bg-slate-900 border-slate-800 text-slate-600'}`}
+              className={`flex-1 py-10 px-4 rounded-[2rem] transition-all border-4 flex flex-col items-center justify-center ${activeTab === cat.label ? 'bg-slate-800 border-emerald-500 text-emerald-400 shadow-[0_0_40px_rgba(16,185,129,0.3)]' : 'bg-slate-900 border-slate-800 text-slate-700'}`}
             >
-              <span className="text-2xl font-black mb-1">{cat.label}</span>
-              <span className="text-sm font-bold opacity-70 mb-1">({cat.max}人)</span>
-              <span className="text-[11px] font-bold uppercase tracking-[0.2em]">{cat.subLabel}</span>
+              <span className="text-5xl font-black mb-3">{cat.label}</span>
+              <span className="text-2xl font-black opacity-90 mb-2">({cat.max}人)</span>
+              <span className="text-sm font-black uppercase tracking-[0.3em]">{cat.subLabel}</span>
             </button>
           ))}
         </div>
 
-        <div className="grid md:grid-cols-5 gap-6">
-          <form onSubmit={handleRegister} className="md:col-span-2 bg-slate-800 p-6 rounded-3xl h-fit space-y-4 border border-slate-700 shadow-2xl">
-            <h2 className="font-bold text-xl text-white mb-2">選手報名</h2>
-            <input type="text" required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} placeholder="您的姓名 Name" className="w-full bg-slate-900 p-4 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 border border-slate-700 text-white" />
-            <input type="password" maxLength={4} required value={formData.edit_code} onChange={e => setFormData({...formData, edit_code: e.target.value})} placeholder="4 碼取消密碼 Pwd" className="w-full bg-slate-900 p-4 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 border border-slate-700 text-white" />
-            <button className="w-full bg-emerald-500 py-4 rounded-xl font-black text-xl hover:bg-emerald-400 transition-all shadow-lg text-white">確認送出</button>
+        <div className="grid md:grid-cols-5 gap-8">
+          <form onSubmit={handleRegister} className="md:col-span-2 bg-slate-800 p-8 rounded-[2.5rem] h-fit space-y-5 border border-slate-700 shadow-2xl">
+            <h2 className="font-bold text-2xl text-white mb-2">選手報名</h2>
+            <div>
+              <label className="text-xs text-slate-500 ml-1">您的姓名 Name</label>
+              <input type="text" required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} placeholder="請輸入姓名" className="w-full bg-slate-900 p-5 rounded-2xl outline-none focus:ring-4 focus:ring-emerald-500/50 border border-slate-700 text-xl text-white" />
+            </div>
+            <div>
+              <label className="text-xs text-slate-500 ml-1">4 碼密碼 Pwd (取消用)</label>
+              <input type="password" maxLength={4} required value={formData.edit_code} onChange={e => setFormData({...formData, edit_code: e.target.value})} placeholder="設定密碼" className="w-full bg-slate-900 p-5 rounded-2xl outline-none focus:ring-4 focus:ring-emerald-500/50 border border-slate-700 text-xl text-white" />
+            </div>
+            <button className="w-full bg-emerald-500 py-5 rounded-2xl font-black text-2xl hover:bg-emerald-400 transition-all shadow-xl active:scale-95 text-white">確認送出</button>
           </form>
 
           <div className="md:col-span-3">
-            <div className="flex justify-between items-center mb-4 px-2">
-              <h2 className="font-bold text-xl">目前清單</h2>
-              <span className="bg-slate-800 px-3 py-1 rounded-full text-xs text-slate-400">剩餘正取：{Math.max(0, currentMax - currentList.length)}</span>
+            <div className="flex justify-between items-center mb-6 px-2">
+              <h2 className="font-bold text-2xl">目前清單</h2>
+              <span className="bg-slate-800 px-4 py-2 rounded-full text-sm text-slate-400">剩餘正取：{Math.max(0, currentMax - currentList.length)}</span>
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-3">
               {currentList.map((p, i) => (
-                <div key={p.id} className="bg-slate-800/40 p-4 rounded-2xl flex justify-between items-center border border-slate-800">
-                  <div className="flex items-center gap-3">
-                    <span className={`text-[11px] font-black px-2 py-0.5 rounded-full ${i >= currentMax ? 'bg-orange-500/10 text-orange-500' : 'bg-emerald-500/10 text-emerald-400'}`}>
-                      {i >= currentMax ? `備取 Waiting ${i - currentMax + 1}` : `No. ${i + 1}`}
+                <div key={p.id} className="bg-slate-800/40 p-5 rounded-3xl flex justify-between items-center border border-slate-800 hover:border-slate-600 transition-all">
+                  <div className="flex items-center gap-4">
+                    <span className={`text-xs font-black px-3 py-1 rounded-full ${i >= currentMax ? 'bg-orange-500/10 text-orange-500' : 'bg-emerald-500/10 text-emerald-400'}`}>
+                      {i >= currentMax ? `備取 Waiting ${i - currentMax + 1}` : `正取 No. ${i + 1}`}
                     </span>
-                    <span className="font-bold text-lg">{p.name}</span>
+                    <span className="font-bold text-xl">{p.name}</span>
                   </div>
-                  <button onClick={() => handleCancel(p)} className="text-xs text-slate-600 hover:text-red-400 px-2 py-1 transition-colors">取消</button>
+                  <button onClick={() => handleCancel(p)} className="text-sm text-slate-600 hover:text-red-400 px-3 py-1 transition-colors">取消</button>
                 </div>
               ))}
-              {currentList.length === 0 && <div className="text-center py-16 text-slate-600 italic font-bold">目前尚無報名資料</div>}
+              {currentList.length === 0 && <div className="text-center py-20 text-slate-600 italic font-bold text-xl">目前尚無報名資料</div>}
             </div>
           </div>
         </div>
