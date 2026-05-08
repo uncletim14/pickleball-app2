@@ -18,7 +18,6 @@ type Participant = {
 };
 
 export default function QiXianPickleball() {
-  // 自動產生接下來三天的日期邏輯
   const getUpcomingDates = () => {
     const now = new Date();
     const dayOfWeek = now.getDay();
@@ -47,7 +46,6 @@ export default function QiXianPickleball() {
   const dayOptions = getUpcomingDates();
   const [selectedDay, setSelectedDay] = useState(dayOptions[0]);
 
-  // 根據日期類型判斷分區與上限
   const getCategories = (dayType: string) => {
     if (dayType === 'thu_special') {
       return [{ id: 'sanda', label: '散打區', subLabel: 'OPEN PLAY', max: 24 }];
@@ -79,18 +77,27 @@ export default function QiXianPickleball() {
     if (!error && data) setParticipants(data);
   };
 
-  // 報名功能
+  // --- 🌟 修正後的報名邏輯 (約在第 85 行附近) ---
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     const regCount = parseInt(formData.count);
     if (formData.edit_code.length !== 4) { alert("請設定 4 位數取消密碼"); return; }
     
+    // 計算該類別目前總人數
     const categoryList = participants.filter(p => p.category === activeTab && p.day_key === selectedDay.key);
     const totalFilled = categoryList.reduce((sum, p) => sum + (p.count || 1), 0);
     const currentMax = categories.find(c => c.label === activeTab)?.max || 16;
 
-    if (totalFilled >= currentMax) {
-      if (!window.confirm(`正取已滿，此筆報名 (${regCount}位) 將全部列為備取，確定嗎？`)) return;
+    // 判斷「加上這次報名人數」後是否超過上限
+    const isExceeding = (totalFilled + regCount) > currentMax;
+
+    if (isExceeding) {
+      const remaining = currentMax - totalFilled;
+      const msg = remaining > 0 
+        ? `目前正取僅剩 ${remaining} 個名額，您的報名人數 (${regCount}位) 已超過餘額。\n\n點擊「確定」將此筆報名全數轉為【備取】，或點擊「取消」重新調整人數。`
+        : `正取已滿，此筆報名 (${regCount}位) 將全數列為【備取】，確定嗎？`;
+      
+      if (!window.confirm(msg)) return;
     }
 
     const { error } = await supabase.from('tournament_participants').insert([{
@@ -102,25 +109,19 @@ export default function QiXianPickleball() {
     }]);
 
     if (!error) {
-      alert(`報名成功！已登記 ${regCount} 位。`);
+      alert(isExceeding ? `名額不足，已轉為備取登記！` : `報名成功！已登記 ${regCount} 位。`);
       setFormData({ name: '', edit_code: '', count: '1' });
       fetchParticipants();
     }
   };
 
-  // 修改人數功能（含名額防護邏輯）
   const handleEdit = async (p: Participant) => {
     const code = window.prompt("請輸入 4 碼密碼以進行修改：");
     if (code === p.edit_code) {
       const newCountStr = window.prompt(`目前人數為 ${p.count} 位，請輸入新的人數 (1-4)：`, p.count.toString());
       const newCount = parseInt(newCountStr || "");
-      
-      if (isNaN(newCount) || newCount < 1 || newCount > 4) {
-        alert("輸入無效，請輸入 1 到 4 之間的數字。");
-        return;
-      }
+      if (isNaN(newCount) || newCount < 1 || newCount > 4) { alert("輸入無效"); return; }
 
-      // 檢查修改後是否會超過該分區上限
       const categoryList = participants.filter(item => item.category === p.category && item.day_key === p.day_key);
       const currentTotalExcludeSelf = categoryList.reduce((sum, item) => item.id === p.id ? sum : sum + (item.count || 1), 0);
       const currentMax = categories.find(c => c.label === p.category)?.max || 16;
@@ -131,16 +132,10 @@ export default function QiXianPickleball() {
       }
 
       const { error } = await supabase.from('tournament_participants').update({ count: newCount }).eq('id', p.id);
-      if (!error) {
-        alert(`人數已成功修改為 ${newCount} 位！`);
-        fetchParticipants();
-      }
-    } else if (code !== null) {
-      alert("密碼錯誤！");
-    }
+      if (!error) { alert("人數已成功修改！"); fetchParticipants(); }
+    } else if (code !== null) { alert("密碼錯誤！"); }
   };
 
-  // 取消報名功能
   const handleCancel = async (p: Participant) => {
     const code = window.prompt("請輸入 4 碼密碼取消所有報名：");
     if (code === p.edit_code) {
@@ -178,7 +173,6 @@ export default function QiXianPickleball() {
           </div>
         </header>
 
-        {/* 分區選擇 */}
         <div className="flex gap-6 mb-12">
           {categories.map(cat => (
             <button key={cat.id} onClick={() => setActiveTab(cat.label)} className={`flex-1 py-12 px-6 rounded-[3rem] transition-all border-4 flex flex-col items-center justify-center ${activeTab === cat.label ? 'bg-slate-800 border-emerald-500 text-emerald-400 shadow-[0_0_50px_rgba(16,185,129,0.3)]' : 'bg-slate-900 border-slate-800 text-slate-700'}`}>
@@ -189,7 +183,6 @@ export default function QiXianPickleball() {
         </div>
 
         <div className="grid lg:grid-cols-5 gap-10">
-          {/* 報名表單 */}
           <form onSubmit={handleRegister} className="lg:col-span-2 bg-slate-800 p-10 rounded-[3rem] space-y-6 border border-slate-700 shadow-2xl h-fit">
             <h2 className="font-black text-3xl text-white mb-4 italic">快速報名</h2>
             <div>
@@ -203,14 +196,12 @@ export default function QiXianPickleball() {
               <input type="text" required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} placeholder="輸入名字" className="w-full bg-slate-900 p-6 rounded-2xl outline-none border border-slate-700 text-2xl font-black text-white mt-2" />
             </div>
             <div>
-              {/* 🌟 密碼提示詞優化：黃色 + 1.5倍大 🌟 */}
               <label className="text-xl text-yellow-400 ml-1 font-black uppercase tracking-widest">3. 密碼 (4 碼)</label>
               <input type="password" maxLength={4} required value={formData.edit_code} onChange={e => setFormData({...formData, edit_code: e.target.value})} placeholder="修改取消用" className="w-full bg-slate-900 p-6 rounded-2xl outline-none border border-slate-700 text-2xl font-black text-white mt-2" />
             </div>
             <button className="w-full bg-emerald-500 py-6 rounded-2xl font-black text-3xl hover:bg-emerald-400 shadow-xl text-white transition-all active:scale-95">確認報名</button>
           </form>
 
-          {/* 報名清單 */}
           <div className="lg:col-span-3">
             <div className="flex justify-between items-center mb-8 px-4">
               <h2 className="font-black text-4xl italic tracking-tighter">報名清單</h2>
@@ -224,18 +215,16 @@ export default function QiXianPickleball() {
                 const isWaitlist = runningTotal >= currentMax;
                 runningTotal += pCount;
                 return (
-                  <div key={p.id} className="bg-slate-800/60 p-5 rounded-[2rem] flex flex-col sm:flex-row justify-between items-center border-2 border-slate-800 hover:border-emerald-500/50 transition-all gap-4">
+                  <div key={p.id} className="bg-slate-800/60 p-5 rounded-[2rem] flex flex-col sm:flex-row justify-between items-center border-2 border-slate-800 hover:border-emerald-500/50 transition-all gap-4 shadow-xl">
                     <div className="flex items-center gap-6 w-full sm:w-auto">
                       <span className={`text-xl font-black px-5 py-2 rounded-xl shrink-0 w-24 text-center ${isWaitlist ? 'bg-orange-500 text-white' : 'bg-emerald-500 text-white'}`}>
                         {isWaitlist ? '備取' : '正取'}
                       </span>
-                      {/* 🌟 名字與人數橫向並排 🌟 */}
                       <div className="flex items-baseline gap-4">
                         <span className="font-black text-4xl text-white tracking-tight">{p.name}</span>
                         <span className="text-2xl text-emerald-400 font-black">{pCount}位</span>
                       </div>
                     </div>
-                    {/* 🌟 按鈕尺寸齊平正取標籤 🌟 */}
                     <div className="flex gap-2 w-full sm:w-auto">
                       <button onClick={() => handleEdit(p)} className="flex-1 sm:flex-none text-xl bg-slate-700 hover:bg-emerald-600 text-white px-5 py-2 rounded-xl transition-all font-black w-24">修改</button>
                       <button onClick={() => handleCancel(p)} className="flex-1 sm:flex-none text-xl bg-red-900/30 hover:bg-red-600 text-red-500 hover:text-white px-5 py-2 rounded-xl transition-all font-black border-2 border-red-900/50 w-24">取消</button>
