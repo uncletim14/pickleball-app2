@@ -29,18 +29,16 @@ export default function QiXianPickleball() {
     const dayOfWeek = now.getDay();
     const hour = now.getHours();
 
-    // 🌟 關鍵邏輯：判斷是否已經進入「下週報名週期」
-    // 只有週六 18:00 之後，才顯示「下週」的日期
-    // 其他時間（週日到週六 17:59）全部顯示「本週」的日期，這樣名單就會保留一整週
-    const isNextWeekCycle = (dayOfWeek === 6 && hour >= 18);
-    
-    // 如果是週六 18:00 後，跳到下週；否則留在本週
-    const startOffset = isNextWeekCycle ? 7 : 0;
+    // 🌟 修正邏輯：
+    // 週六 18:00 到 週日 23:59 之間，我們都顯示「即將到來的那一週」
+    // 這樣週日就不會看到「已結束」的舊日期
+    const isReadyForNextWeek = (dayOfWeek === 6 && hour >= 18) || dayOfWeek === 0;
+    const startOffset = isReadyForNextWeek ? 7 : 0;
 
     const getTargetDate = (targetDay: number) => {
       const d = new Date(now);
-      // 回推到本週週一的基準點 (如果是週日則視為本週結束前的最後一天)
-      const diffToMon = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+      // 回推到本週週一的基準點
+      const diffToMon = dayOfWeek === 0 ? 7 : dayOfWeek - 1;
       d.setDate(now.getDate() - diffToMon + (targetDay - 1) + startOffset);
       d.setHours(0, 0, 0, 0);
       return d;
@@ -63,12 +61,9 @@ export default function QiXianPickleball() {
   const dayOptions = getUpcomingDates();
   const [selectedDay, setSelectedDay] = useState(dayOptions[0]);
 
-  // 檢查選中的場次是否已過期 (場次當天過後就不能報名/修改)
-  const isExpired = now.getTime() > selectedDay.dateObj.getTime() + 86400000;
+  // 🌟 放寬報名表鎖定邏輯：只要還沒過「場次當天晚上 22:00」，就允許報名/修改
+  const isExpired = now.getTime() > selectedDay.dateObj.getTime() + (22 * 60 * 60 * 1000);
   
-  // 系統是否開放報名 (週六 18:00 後才開放)
-  const isRegistrationOpen = (now.getDay() === 6 && now.getHours() >= 18) || now.getDay() === 0 || (now.getDay() >= 1 && now.getDay() <= 5);
-
   const getCategories = (dayType: string) => {
     if (dayType === 'thu_special') return [{ id: 'sanda', label: '散打區', subLabel: 'OPEN PLAY', max: 24 }];
     return [
@@ -94,11 +89,10 @@ export default function QiXianPickleball() {
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isExpired) { alert("該場次已結束，無法報名。"); return; }
-
+    if (isExpired) { alert("該場次已結束！"); return; }
     const regCount = parseInt(formData.count);
     const trimmedName = formData.name.trim();
-    if (formData.edit_code.length !== 4) { alert("請設定 4 位數取消密碼"); return; }
+    if (formData.edit_code.length !== 4) { alert("請設定 4 位數密碼"); return; }
     
     const isDuplicate = participants.some(p => p.day_key === selectedDay.key && p.category === activeTab && p.name.toLowerCase() === trimmedName.toLowerCase());
     if (isDuplicate) { alert(`「${trimmedName}」已報名過此場次！`); return; }
@@ -173,28 +167,28 @@ export default function QiXianPickleball() {
             {isExpired ? (
               <div className="bg-slate-800/50 p-10 rounded-[3rem] border border-slate-700 text-center shadow-inner">
                 <p className="text-2xl font-bold text-slate-400 italic">場次已結束</p>
-                <p className="text-slate-500 mt-2">名項保留供查閱，無法再報名</p>
+                <p className="text-slate-500 mt-2 italic text-sm">名單保留一週供查閱</p>
               </div>
             ) : (
               <form onSubmit={handleRegister} className="bg-slate-800 p-10 rounded-[3rem] space-y-6 border border-slate-700 shadow-2xl relative overflow-hidden">
-                <div className="absolute top-0 right-0 bg-emerald-500 text-slate-900 px-4 py-1 font-black text-xs uppercase tracking-tighter">Open</div>
-                <h2 className="font-black text-3xl text-white mb-4 italic uppercase">報名表單</h2>
+                <div className="absolute top-0 right-0 bg-emerald-500 text-slate-900 px-4 py-1 font-black text-xs uppercase">Open</div>
+                <h2 className="font-black text-3xl text-white mb-4 italic uppercase">快速報名</h2>
                 <div className="space-y-4">
                   <div>
-                    <label className="text-sm text-slate-500 font-black tracking-widest uppercase">1. 人數</label>
+                    <label className="text-sm text-slate-500 font-black tracking-widest uppercase italic">1. 人數</label>
                     <select value={formData.count} onChange={e => setFormData({...formData, count: e.target.value})} className="w-full bg-slate-900 p-6 rounded-2xl border border-slate-700 text-2xl font-black text-white appearance-none mt-2">
                       {[1,2,3,4].map(n => <option key={n} value={n}>{n} 位</option>)}
                     </select>
                   </div>
                   <div>
-                    <label className="text-sm text-slate-500 font-black tracking-widest uppercase">2. 姓名</label>
+                    <label className="text-sm text-slate-500 font-black tracking-widest uppercase italic">2. 代表姓名</label>
                     <input type="text" required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} placeholder="代表姓名" className="w-full bg-slate-900 p-6 rounded-2xl border border-slate-700 text-2xl font-black text-white mt-2" />
                   </div>
                   <div>
-                    <label className="text-sm text-yellow-400 font-black tracking-widest uppercase">3. 密碼 (4 碼)</label>
+                    <label className="text-sm text-yellow-400 font-black tracking-widest uppercase italic">3. 密碼 (4 碼)</label>
                     <input type="password" maxLength={4} required value={formData.edit_code} onChange={e => setFormData({...formData, edit_code: e.target.value})} placeholder="修改取消用" className="w-full bg-slate-900 p-6 rounded-2xl border border-slate-700 text-2xl font-black text-white mt-2" />
                   </div>
-                  <button className="w-full bg-emerald-500 py-6 rounded-2xl font-black text-3xl hover:bg-emerald-400 text-white transition-all active:scale-95 shadow-lg shadow-emerald-500/20">確認報名</button>
+                  <button className="w-full bg-emerald-500 py-6 rounded-2xl font-black text-3xl hover:bg-emerald-400 text-white transition-all active:scale-95 shadow-lg shadow-emerald-500/20 uppercase italic">確認報名</button>
                 </div>
               </form>
             )}
@@ -202,7 +196,7 @@ export default function QiXianPickleball() {
 
           <div className="lg:col-span-3">
             <div className="flex justify-between items-center mb-8 px-4">
-              <h2 className="font-black text-4xl italic tracking-tighter">報名清單</h2>
+              <h2 className="font-black text-4xl italic tracking-tighter uppercase">報名清單</h2>
               <span className="bg-slate-800 px-6 py-3 rounded-full text-xl text-slate-400 font-black">
                 正取：{confirmedTotal} / {currentMax}
               </span>
@@ -220,17 +214,23 @@ export default function QiXianPickleball() {
                     </div>
                   </div>
                   <div className="flex gap-2 w-full sm:w-auto">
-                    <button disabled={isExpired} onClick={() => {
+                    <button disabled={isExpired} onClick={async () => {
                         const code = window.prompt("請輸入密碼：");
                         if (code === p.edit_code) {
                           const newCount = parseInt(window.prompt("新人數 (1-4)：", p.count.toString()) || "");
-                          if (!isNaN(newCount)) supabase.from('tournament_participants').update({ count: newCount }).eq('id', p.id).then(() => fetchParticipants());
+                          if (!isNaN(newCount)) {
+                            await supabase.from('tournament_participants').update({ count: newCount }).eq('id', p.id);
+                            fetchParticipants();
+                          }
                         } else if (code) alert("密碼錯誤！");
-                    }} className={`text-xl px-5 py-2 rounded-xl font-black w-24 ${isExpired ? 'bg-slate-800 text-slate-600 cursor-not-allowed' : 'bg-slate-700 text-white hover:bg-slate-600'}`}>修改</button>
-                    <button disabled={isExpired} onClick={() => {
+                    }} className={`text-xl px-5 py-2 rounded-xl font-black w-24 ${isExpired ? 'bg-slate-800 text-slate-600' : 'bg-slate-700 text-white hover:bg-slate-600'}`}>修改</button>
+                    <button disabled={isExpired} onClick={async () => {
                         const code = window.prompt("請輸入密碼：");
-                        if (code === p.edit_code && window.confirm("確定取消報名？")) supabase.from('tournament_participants').delete().eq('id', p.id).then(() => fetchParticipants());
-                    }} className={`text-xl px-5 py-2 rounded-xl font-black border-2 w-24 ${isExpired ? 'border-slate-800 text-slate-600 cursor-not-allowed' : 'border-red-900/50 text-red-500 bg-red-900/30 hover:bg-red-900/50'}`}>取消</button>
+                        if (code === p.edit_code && window.confirm("確定取消報名？")) {
+                          await supabase.from('tournament_participants').delete().eq('id', p.id);
+                          fetchParticipants();
+                        }
+                    }} className={`text-xl px-5 py-2 rounded-xl font-black border-2 w-24 ${isExpired ? 'border-slate-800 text-slate-600' : 'border-red-900/50 text-red-500 bg-red-900/30 hover:bg-red-900/50'}`}>取消</button>
                   </div>
                 </div>
               ))}
