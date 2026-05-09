@@ -26,19 +26,18 @@ export default function QiXianPickleball() {
   }, []);
 
   const getUpcomingDates = () => {
-    const dayOfWeek = now.getDay(); // 0(日) 到 6(六)
+    const dayOfWeek = now.getDay(); 
     const hour = now.getHours();
 
-    // 🌟 邏輯優化：找出這三場球賽屬於「哪一週」的基準日
-    // 規則：週六 18:00 之前，顯示「本週」；週六 18:00 之後（含週日整天），顯示「下週」。
+    // 🌟 邏輯鎖定：週六 18:00 到週日 23:59，一律顯示下一週的日期
     const isNextWeekCycle = (dayOfWeek === 6 && hour >= 18) || dayOfWeek === 0;
     
-    // 找出本週週一的日期
     const baseMon = new Date(now);
-    const diffToMon = dayOfWeek === 0 ? 6 : dayOfWeek - 1; 
+    // 找出「這週一」
+    const diffToMon = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
     baseMon.setDate(now.getDate() - diffToMon);
     
-    // 如果進入下週週期，將基準週一往後推 7 天
+    // 如果是下週週期，基準週一往後推 7 天
     if (isNextWeekCycle) {
       baseMon.setDate(baseMon.getDate() + 7);
     }
@@ -50,7 +49,6 @@ export default function QiXianPickleball() {
       return d;
     };
 
-    // 基準是週一(0)，所以週四是 +3，週五是 +4
     const mon = getTargetDate(0);
     const thu = getTargetDate(3);
     const fri = getTargetDate(4);
@@ -68,7 +66,7 @@ export default function QiXianPickleball() {
   const dayOptions = getUpcomingDates();
   const [selectedDay, setSelectedDay] = useState(dayOptions[0]);
 
-  // 過期判定：場次當天晚上 22:00 後鎖定
+  // 過期判定
   const isExpired = now.getTime() > selectedDay.dateObj.getTime() + (22 * 60 * 60 * 1000);
   
   const getCategories = (dayType: string) => {
@@ -90,6 +88,7 @@ export default function QiXianPickleball() {
   }, [selectedDay, activeTab]);
 
   const fetchParticipants = async () => {
+    // 🌟 這裡改成抓取全部資料，不設日期過濾，由前端篩選更準確
     const { data, error } = await supabase.from('tournament_participants').select('*').order('id', { ascending: true });
     if (!error && data) setParticipants(data);
   };
@@ -101,6 +100,7 @@ export default function QiXianPickleball() {
     const trimmedName = formData.name.trim();
     if (formData.edit_code.length !== 4) { alert("請設定 4 位數密碼"); return; }
     
+    // 檢查重複時要鎖定當前日期 key
     const isDuplicate = participants.some(p => p.day_key === selectedDay.key && p.category === activeTab && p.name.toLowerCase() === trimmedName.toLowerCase());
     if (isDuplicate) { alert(`「${trimmedName}」已報名過此場次！`); return; }
 
@@ -111,12 +111,14 @@ export default function QiXianPickleball() {
     if (!error) {
       setFormData({ name: '', edit_code: '', count: '1' });
       fetchParticipants();
-      alert("報名完成！");
+      alert("報名成功！");
     }
   };
 
-  const currentGroup = participants.filter(p => p.category === activeTab && p.day_key === selectedDay.key);
+  // 前端精準過濾
+  const currentGroup = participants.filter(p => p.day_key === selectedDay.key && p.category === activeTab);
   const currentMax = categories.find(c => c.label === activeTab)?.max || 16;
+  
   let runningTotal = 0;
   let hasMetWaitlist = false; 
   const listWithStatus = currentGroup.map(p => {
@@ -173,7 +175,7 @@ export default function QiXianPickleball() {
           <div className="lg:col-span-2">
             {isExpired ? (
               <div className="bg-slate-800/50 p-10 rounded-[3rem] border border-slate-700 text-center shadow-inner">
-                <p className="text-2xl font-bold text-slate-400 italic">場次已結束</p>
+                <p className="text-2xl font-bold text-slate-400 italic text-white uppercase">場次已結束</p>
                 <p className="text-slate-500 mt-2 italic text-sm">名單保留一週供查閱</p>
               </div>
             ) : (
