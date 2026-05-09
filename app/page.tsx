@@ -27,12 +27,21 @@ export default function QiXianPickleball() {
 
   const getUpcomingDates = () => {
     const dayOfWeek = now.getDay();
-    const isAfterOpening = (dayOfWeek === 6 && now.getHours() >= 18) || dayOfWeek === 0;
-    const startOffset = isAfterOpening ? 7 : 0;
+    const hour = now.getHours();
+
+    // 🌟 關鍵邏輯：判斷是否已經進入「下週報名週期」
+    // 只有週六 18:00 之後，才顯示「下週」的日期
+    // 其他時間（週日到週六 17:59）全部顯示「本週」的日期，這樣名單就會保留一整週
+    const isNextWeekCycle = (dayOfWeek === 6 && hour >= 18);
+    
+    // 如果是週六 18:00 後，跳到下週；否則留在本週
+    const startOffset = isNextWeekCycle ? 7 : 0;
 
     const getTargetDate = (targetDay: number) => {
       const d = new Date(now);
-      d.setDate(now.getDate() - dayOfWeek + targetDay + startOffset);
+      // 回推到本週週一的基準點 (如果是週日則視為本週結束前的最後一天)
+      const diffToMon = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+      d.setDate(now.getDate() - diffToMon + (targetDay - 1) + startOffset);
       d.setHours(0, 0, 0, 0);
       return d;
     };
@@ -54,7 +63,10 @@ export default function QiXianPickleball() {
   const dayOptions = getUpcomingDates();
   const [selectedDay, setSelectedDay] = useState(dayOptions[0]);
 
+  // 檢查選中的場次是否已過期 (場次當天過後就不能報名/修改)
   const isExpired = now.getTime() > selectedDay.dateObj.getTime() + 86400000;
+  
+  // 系統是否開放報名 (週六 18:00 後才開放)
   const isRegistrationOpen = (now.getDay() === 6 && now.getHours() >= 18) || now.getDay() === 0 || (now.getDay() >= 1 && now.getDay() <= 5);
 
   const getCategories = (dayType: string) => {
@@ -82,8 +94,7 @@ export default function QiXianPickleball() {
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isRegistrationOpen) { alert("報名尚未開放！"); return; }
-    if (isExpired) { alert("場次已結束！"); return; }
+    if (isExpired) { alert("該場次已結束，無法報名。"); return; }
 
     const regCount = parseInt(formData.count);
     const trimmedName = formData.name.trim();
@@ -105,7 +116,6 @@ export default function QiXianPickleball() {
 
   const currentGroup = participants.filter(p => p.category === activeTab && p.day_key === selectedDay.key);
   const currentMax = categories.find(c => c.label === activeTab)?.max || 16;
-  
   let runningTotal = 0;
   let hasMetWaitlist = false; 
   const listWithStatus = currentGroup.map(p => {
@@ -128,7 +138,6 @@ export default function QiXianPickleball() {
             <h1 className="text-4xl md:text-6xl font-black text-emerald-400 italic tracking-widest uppercase">七賢國小匹克交流團</h1>
           </div>
           
-          {/* 🌟 調整字體大小與公告一致的資訊區塊 */}
           <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-full px-8 py-3 mb-4 inline-block shadow-lg">
             <div className="text-lg font-bold text-emerald-400 flex flex-wrap justify-center gap-x-8 gap-y-2">
               <span>🕒 19:00 - 21:20</span>
@@ -161,15 +170,10 @@ export default function QiXianPickleball() {
 
         <div className="grid lg:grid-cols-5 gap-10">
           <div className="lg:col-span-2">
-            {!isRegistrationOpen ? (
+            {isExpired ? (
               <div className="bg-slate-800/50 p-10 rounded-[3rem] border border-slate-700 text-center shadow-inner">
-                <p className="text-2xl font-bold text-slate-400 italic">尚未開放報名</p>
-                <p className="text-slate-500 mt-2">請於週六 18:00 後再來</p>
-              </div>
-            ) : isExpired ? (
-              <div className="bg-red-900/10 p-10 rounded-[3rem] border border-red-900/30 text-center">
-                <p className="text-2xl font-bold text-red-400 italic">場次已結束</p>
-                <p className="text-red-500/70 mt-2">無法再進行報名</p>
+                <p className="text-2xl font-bold text-slate-400 italic">場次已結束</p>
+                <p className="text-slate-500 mt-2">名項保留供查閱，無法再報名</p>
               </div>
             ) : (
               <form onSubmit={handleRegister} className="bg-slate-800 p-10 rounded-[3rem] space-y-6 border border-slate-700 shadow-2xl relative overflow-hidden">
