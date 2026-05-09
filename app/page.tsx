@@ -26,27 +26,34 @@ export default function QiXianPickleball() {
   }, []);
 
   const getUpcomingDates = () => {
-    const dayOfWeek = now.getDay();
+    const dayOfWeek = now.getDay(); // 0(日) 到 6(六)
     const hour = now.getHours();
 
-    // 🌟 修正邏輯：
-    // 週六 18:00 到 週日 23:59 之間，我們都顯示「即將到來的那一週」
-    // 這樣週日就不會看到「已結束」的舊日期
-    const isReadyForNextWeek = (dayOfWeek === 6 && hour >= 18) || dayOfWeek === 0;
-    const startOffset = isReadyForNextWeek ? 7 : 0;
+    // 🌟 邏輯優化：找出這三場球賽屬於「哪一週」的基準日
+    // 規則：週六 18:00 之前，顯示「本週」；週六 18:00 之後（含週日整天），顯示「下週」。
+    const isNextWeekCycle = (dayOfWeek === 6 && hour >= 18) || dayOfWeek === 0;
+    
+    // 找出本週週一的日期
+    const baseMon = new Date(now);
+    const diffToMon = dayOfWeek === 0 ? 6 : dayOfWeek - 1; 
+    baseMon.setDate(now.getDate() - diffToMon);
+    
+    // 如果進入下週週期，將基準週一往後推 7 天
+    if (isNextWeekCycle) {
+      baseMon.setDate(baseMon.getDate() + 7);
+    }
 
-    const getTargetDate = (targetDay: number) => {
-      const d = new Date(now);
-      // 回推到本週週一的基準點
-      const diffToMon = dayOfWeek === 0 ? 7 : dayOfWeek - 1;
-      d.setDate(now.getDate() - diffToMon + (targetDay - 1) + startOffset);
+    const getTargetDate = (offsetDays: number) => {
+      const d = new Date(baseMon);
+      d.setDate(baseMon.getDate() + offsetDays);
       d.setHours(0, 0, 0, 0);
       return d;
     };
 
-    const mon = getTargetDate(1);
-    const thu = getTargetDate(4);
-    const fri = getTargetDate(5);
+    // 基準是週一(0)，所以週四是 +3，週五是 +4
+    const mon = getTargetDate(0);
+    const thu = getTargetDate(3);
+    const fri = getTargetDate(4);
 
     const format = (d: Date) => `${d.getMonth() + 1}/${d.getDate()}`;
     const formatKey = (d: Date) => `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
@@ -61,7 +68,7 @@ export default function QiXianPickleball() {
   const dayOptions = getUpcomingDates();
   const [selectedDay, setSelectedDay] = useState(dayOptions[0]);
 
-  // 🌟 放寬報名表鎖定邏輯：只要還沒過「場次當天晚上 22:00」，就允許報名/修改
+  // 過期判定：場次當天晚上 22:00 後鎖定
   const isExpired = now.getTime() > selectedDay.dateObj.getTime() + (22 * 60 * 60 * 1000);
   
   const getCategories = (dayType: string) => {
@@ -129,7 +136,7 @@ export default function QiXianPickleball() {
         <header className="text-center mb-10">
           <div className="flex flex-col md:flex-row items-center justify-center gap-6 mb-6">
             <Image src="/七賢LOGO.png" alt="LOGO" width={80} height={80} className="rounded-full shadow-2xl" />
-            <h1 className="text-4xl md:text-6xl font-black text-emerald-400 italic tracking-widest uppercase">七賢國小匹克交流團</h1>
+            <h1 className="text-4xl md:text-6xl font-black text-emerald-400 italic tracking-widest uppercase text-shadow-sm">七賢國小匹克交流團</h1>
           </div>
           
           <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-full px-8 py-3 mb-4 inline-block shadow-lg">
@@ -196,7 +203,7 @@ export default function QiXianPickleball() {
 
           <div className="lg:col-span-3">
             <div className="flex justify-between items-center mb-8 px-4">
-              <h2 className="font-black text-4xl italic tracking-tighter uppercase">報名清單</h2>
+              <h2 className="font-black text-4xl italic tracking-tighter uppercase text-white">報名清單</h2>
               <span className="bg-slate-800 px-6 py-3 rounded-full text-xl text-slate-400 font-black">
                 正取：{confirmedTotal} / {currentMax}
               </span>
