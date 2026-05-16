@@ -29,15 +29,12 @@ export default function QiXianPickleball() {
     const dayOfWeek = now.getDay(); 
     const hour = now.getHours();
 
-    // 🌟 邏輯鎖定：週六 18:00 到週日 23:59，一律顯示下一週的日期
     const isNextWeekCycle = (dayOfWeek === 6 && hour >= 18) || dayOfWeek === 0;
     
     const baseMon = new Date(now);
-    // 找出「這週一」
     const diffToMon = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
     baseMon.setDate(now.getDate() - diffToMon);
     
-    // 如果是下週週期，基準週一往後推 7 天
     if (isNextWeekCycle) {
       baseMon.setDate(baseMon.getDate() + 7);
     }
@@ -57,7 +54,7 @@ export default function QiXianPickleball() {
     const formatKey = (d: Date) => `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
 
     return [
-      { label: `週一 (${format(mon)})`, key: formatKey(mon), dateObj: mon, type: 'normal' },
+      { label: `週一 (${format(mon)})`, key: formatKey(mon), dateObj: mon, type: 'mon_special' },
       { label: `週四 (${format(thu)})`, key: formatKey(thu), dateObj: thu, type: 'thu_special' },
       { label: `週五 (${format(fri)})`, key: formatKey(fri), dateObj: fri, type: 'normal' },
     ];
@@ -66,14 +63,19 @@ export default function QiXianPickleball() {
   const dayOptions = getUpcomingDates();
   const [selectedDay, setSelectedDay] = useState(dayOptions[0]);
 
-  // 過期判定
+  const isRegistrationOpen = true; 
   const isExpired = now.getTime() > selectedDay.dateObj.getTime() + (22 * 60 * 60 * 1000);
   
+  // 🌟 核心修改：為每個區域加上 isClosed 屬性
   const getCategories = (dayType: string) => {
-    if (dayType === 'thu_special') return [{ id: 'sanda', label: '散打區', subLabel: 'OPEN PLAY', max: 24 }];
+    if (dayType === 'thu_special') return [{ id: 'sanda', label: '散打區', subLabel: 'OPEN PLAY', max: 24, isClosed: false }];
+    if (dayType === 'mon_special') return [
+      { id: 'sanda', label: '散打區', subLabel: 'OPEN PLAY', max: 16, isClosed: false },
+      { id: 'newbie', label: '新手區', subLabel: 'BEGINNER FRIENDLY', max: 8, isClosed: true }, // 週一新手區設定為關閉
+    ];
     return [
-      { id: 'sanda', label: '散打區', subLabel: 'OPEN PLAY', max: 16 },
-      { id: 'newbie', label: '新手區', subLabel: 'BEGINNER FRIENDLY', max: 8 },
+      { id: 'sanda', label: '散打區', subLabel: 'OPEN PLAY', max: 16, isClosed: false },
+      { id: 'newbie', label: '新手區', subLabel: 'BEGINNER FRIENDLY', max: 8, isClosed: false },
     ];
   };
 
@@ -82,13 +84,21 @@ export default function QiXianPickleball() {
   const [formData, setFormData] = useState({ name: '', edit_code: '', count: '1' });
   const [participants, setParticipants] = useState<Participant[]>([]);
 
+  // 🌟 防呆：如果球友停留在「新手區」，卻切換日期到「週一」，系統會自動把他拉回「散打區」
+  useEffect(() => {
+    const currentCategories = getCategories(selectedDay.type);
+    const validLabels = currentCategories.filter(c => !c.isClosed).map(c => c.label);
+    if (!validLabels.includes(activeTab)) {
+      setActiveTab(validLabels[0]);
+    }
+  }, [selectedDay]);
+
   useEffect(() => {
     document.title = "七賢國小匹克交流團報名系統";
     fetchParticipants();
   }, [selectedDay, activeTab]);
 
   const fetchParticipants = async () => {
-    // 🌟 這裡改成抓取全部資料，不設日期過濾，由前端篩選更準確
     const { data, error } = await supabase.from('tournament_participants').select('*').order('id', { ascending: true });
     if (!error && data) setParticipants(data);
   };
@@ -100,7 +110,6 @@ export default function QiXianPickleball() {
     const trimmedName = formData.name.trim();
     if (formData.edit_code.length !== 4) { alert("請設定 4 位數密碼"); return; }
     
-    // 檢查重複時要鎖定當前日期 key
     const isDuplicate = participants.some(p => p.day_key === selectedDay.key && p.category === activeTab && p.name.toLowerCase() === trimmedName.toLowerCase());
     if (isDuplicate) { alert(`「${trimmedName}」已報名過此場次！`); return; }
 
@@ -115,7 +124,6 @@ export default function QiXianPickleball() {
     }
   };
 
-  // 前端精準過濾
   const currentGroup = participants.filter(p => p.day_key === selectedDay.key && p.category === activeTab);
   const currentMax = categories.find(c => c.label === activeTab)?.max || 16;
   
@@ -150,8 +158,8 @@ export default function QiXianPickleball() {
           </div>
 
           <div className="mb-8">
-            <span className="bg-orange-500/20 text-orange-400 border border-orange-500/40 px-6 py-2 rounded-full text-lg font-bold">
-              📢 每週六晚上 18:00 開放下一週報名
+            <span className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 px-6 py-2 rounded-full text-lg font-bold">
+              ✅ 目前系統已全面開放報名中
             </span>
           </div>
 
@@ -162,11 +170,24 @@ export default function QiXianPickleball() {
           </div>
         </header>
 
+        {/* 🌟 修改點：根據 isClosed 屬性動態渲染按鈕外觀 */}
         <div className="flex gap-4 mb-10">
           {categories.map(cat => (
-            <button key={cat.id} onClick={() => setActiveTab(cat.label)} className={`flex-1 py-8 px-4 rounded-[2rem] transition-all border-4 flex flex-col items-center justify-center ${activeTab === cat.label ? 'bg-slate-800 border-emerald-500 text-emerald-400 shadow-xl' : 'bg-slate-900 border-slate-800 text-slate-700'}`}>
+            <button 
+              key={cat.id} 
+              onClick={() => { if (!cat.isClosed) setActiveTab(cat.label); }} 
+              className={`flex-1 py-8 px-4 rounded-[2rem] transition-all border-4 flex flex-col items-center justify-center ${
+                activeTab === cat.label 
+                  ? 'bg-slate-800 border-emerald-500 text-emerald-400 shadow-xl' 
+                  : cat.isClosed
+                    ? 'bg-slate-900 border-slate-800/50 text-slate-600 cursor-not-allowed' // 關閉時的灰色樣式
+                    : 'bg-slate-900 border-slate-800 text-slate-700 hover:bg-slate-800'
+              }`}
+            >
               <span className="text-4xl font-black mb-2">{cat.label}</span>
-              <span className="text-xl font-black opacity-90">({cat.max}人)</span>
+              <span className={`text-xl font-black ${cat.isClosed ? 'text-red-500/80' : 'opacity-90'}`}>
+                {cat.isClosed ? '這周未開放' : `(${cat.max}人)`}
+              </span>
             </button>
           ))}
         </div>
