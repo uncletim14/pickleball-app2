@@ -63,15 +63,16 @@ export default function QiXianPickleball() {
   const dayOptions = getUpcomingDates();
   const [selectedDay, setSelectedDay] = useState(dayOptions[0]);
 
-  const isRegistrationOpen = true; 
+  // 🌟 恢復定時鎖定邏輯：除了週六 18:00 之前，其他時間都開放
+  const isRegistrationOpen = now.getDay() !== 6 || now.getHours() >= 18; 
+  
   const isExpired = now.getTime() > selectedDay.dateObj.getTime() + (22 * 60 * 60 * 1000);
   
-  // 🌟 核心修改：為每個區域加上 isClosed 屬性
   const getCategories = (dayType: string) => {
     if (dayType === 'thu_special') return [{ id: 'sanda', label: '散打區', subLabel: 'OPEN PLAY', max: 24, isClosed: false }];
     if (dayType === 'mon_special') return [
       { id: 'sanda', label: '散打區', subLabel: 'OPEN PLAY', max: 16, isClosed: false },
-      { id: 'newbie', label: '新手區', subLabel: 'BEGINNER FRIENDLY', max: 8, isClosed: true }, // 週一新手區設定為關閉
+      { id: 'newbie', label: '新手區', subLabel: 'BEGINNER FRIENDLY', max: 8, isClosed: true },
     ];
     return [
       { id: 'sanda', label: '散打區', subLabel: 'OPEN PLAY', max: 16, isClosed: false },
@@ -84,7 +85,6 @@ export default function QiXianPickleball() {
   const [formData, setFormData] = useState({ name: '', edit_code: '', count: '1' });
   const [participants, setParticipants] = useState<Participant[]>([]);
 
-  // 🌟 防呆：如果球友停留在「新手區」，卻切換日期到「週一」，系統會自動把他拉回「散打區」
   useEffect(() => {
     const currentCategories = getCategories(selectedDay.type);
     const validLabels = currentCategories.filter(c => !c.isClosed).map(c => c.label);
@@ -105,7 +105,10 @@ export default function QiXianPickleball() {
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
+    // 🌟 重新加上未開放的擋板檢查
+    if (!isRegistrationOpen) { alert("報名尚未開放！請於週六 18:00 後再來。"); return; }
     if (isExpired) { alert("該場次已結束！"); return; }
+    
     const regCount = parseInt(formData.count);
     const trimmedName = formData.name.trim();
     if (formData.edit_code.length !== 4) { alert("請設定 4 位數密碼"); return; }
@@ -158,8 +161,9 @@ export default function QiXianPickleball() {
           </div>
 
           <div className="mb-8">
-            <span className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 px-6 py-2 rounded-full text-lg font-bold">
-              ✅ 目前系統已全面開放報名中
+            {/* 🌟 換回原本橘色的系統公告 */}
+            <span className="bg-orange-500/20 text-orange-400 border border-orange-500/40 px-6 py-2 rounded-full text-lg font-bold">
+              📢 每週六晚上 18:00 開放下一週報名
             </span>
           </div>
 
@@ -170,7 +174,6 @@ export default function QiXianPickleball() {
           </div>
         </header>
 
-        {/* 🌟 修改點：根據 isClosed 屬性動態渲染按鈕外觀 */}
         <div className="flex gap-4 mb-10">
           {categories.map(cat => (
             <button 
@@ -180,7 +183,7 @@ export default function QiXianPickleball() {
                 activeTab === cat.label 
                   ? 'bg-slate-800 border-emerald-500 text-emerald-400 shadow-xl' 
                   : cat.isClosed
-                    ? 'bg-slate-900 border-slate-800/50 text-slate-600 cursor-not-allowed' // 關閉時的灰色樣式
+                    ? 'bg-slate-900 border-slate-800/50 text-slate-600 cursor-not-allowed'
                     : 'bg-slate-900 border-slate-800 text-slate-700 hover:bg-slate-800'
               }`}
             >
@@ -194,7 +197,13 @@ export default function QiXianPickleball() {
 
         <div className="grid lg:grid-cols-5 gap-10">
           <div className="lg:col-span-2">
-            {isExpired ? (
+            {/* 🌟 判斷是否開放，並顯示對應的畫面 */}
+            {!isRegistrationOpen ? (
+              <div className="bg-slate-800/50 p-10 rounded-[3rem] border border-slate-700 text-center shadow-inner">
+                <p className="text-2xl font-bold text-slate-400 italic">尚未開放報名</p>
+                <p className="text-slate-500 mt-2">請於今日 18:00 後再來</p>
+              </div>
+            ) : isExpired ? (
               <div className="bg-slate-800/50 p-10 rounded-[3rem] border border-slate-700 text-center shadow-inner">
                 <p className="text-2xl font-bold text-slate-400 italic text-white uppercase">場次已結束</p>
                 <p className="text-slate-500 mt-2 italic text-sm">名單保留一週供查閱</p>
@@ -244,7 +253,7 @@ export default function QiXianPickleball() {
                     </div>
                   </div>
                   <div className="flex gap-2 w-full sm:w-auto">
-                    <button disabled={isExpired} onClick={async () => {
+                    <button disabled={isExpired || !isRegistrationOpen} onClick={async () => {
                         const code = window.prompt("請輸入密碼：");
                         if (code === p.edit_code) {
                           const newCount = parseInt(window.prompt("新人數 (1-4)：", p.count.toString()) || "");
@@ -253,14 +262,14 @@ export default function QiXianPickleball() {
                             fetchParticipants();
                           }
                         } else if (code) alert("密碼錯誤！");
-                    }} className={`text-xl px-5 py-2 rounded-xl font-black w-24 ${isExpired ? 'bg-slate-800 text-slate-600' : 'bg-slate-700 text-white hover:bg-slate-600'}`}>修改</button>
-                    <button disabled={isExpired} onClick={async () => {
+                    }} className={`text-xl px-5 py-2 rounded-xl font-black w-24 ${isExpired || !isRegistrationOpen ? 'bg-slate-800 text-slate-600 cursor-not-allowed' : 'bg-slate-700 text-white hover:bg-slate-600'}`}>修改</button>
+                    <button disabled={isExpired || !isRegistrationOpen} onClick={async () => {
                         const code = window.prompt("請輸入密碼：");
                         if (code === p.edit_code && window.confirm("確定取消報名？")) {
                           await supabase.from('tournament_participants').delete().eq('id', p.id);
                           fetchParticipants();
                         }
-                    }} className={`text-xl px-5 py-2 rounded-xl font-black border-2 w-24 ${isExpired ? 'border-slate-800 text-slate-600' : 'border-red-900/50 text-red-500 bg-red-900/30 hover:bg-red-900/50'}`}>取消</button>
+                    }} className={`text-xl px-5 py-2 rounded-xl font-black border-2 w-24 ${isExpired || !isRegistrationOpen ? 'border-slate-800 text-slate-600 cursor-not-allowed' : 'border-red-900/50 text-red-500 bg-red-900/30 hover:bg-red-900/50'}`}>取消</button>
                   </div>
                 </div>
               ))}
