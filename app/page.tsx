@@ -63,16 +63,15 @@ export default function QiXianPickleball() {
   const dayOptions = getUpcomingDates();
   const [selectedDay, setSelectedDay] = useState(dayOptions[0]);
 
-  // 🌟 恢復定時鎖定邏輯：除了週六 18:00 之前，其他時間都開放
   const isRegistrationOpen = now.getDay() !== 6 || now.getHours() >= 18; 
-  
   const isExpired = now.getTime() > selectedDay.dateObj.getTime() + (22 * 60 * 60 * 1000);
   
+  // 🌟 核心修改：將週一 (mon_special) 新手區的 isClosed 改回 false，名額為 8 人
   const getCategories = (dayType: string) => {
     if (dayType === 'thu_special') return [{ id: 'sanda', label: '散打區', subLabel: 'OPEN PLAY', max: 24, isClosed: false }];
     if (dayType === 'mon_special') return [
       { id: 'sanda', label: '散打區', subLabel: 'OPEN PLAY', max: 16, isClosed: false },
-      { id: 'newbie', label: '新手區', subLabel: 'BEGINNER FRIENDLY', max: 8, isClosed: true },
+      { id: 'newbie', label: '新手區', subLabel: 'BEGINNER FRIENDLY', max: 8, isClosed: false }, // 恢復開放
     ];
     return [
       { id: 'sanda', label: '散打區', subLabel: 'OPEN PLAY', max: 16, isClosed: false },
@@ -105,7 +104,6 @@ export default function QiXianPickleball() {
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    // 🌟 重新加上未開放的擋板檢查
     if (!isRegistrationOpen) { alert("報名尚未開放！請於週六 18:00 後再來。"); return; }
     if (isExpired) { alert("該場次已結束！"); return; }
     
@@ -161,7 +159,6 @@ export default function QiXianPickleball() {
           </div>
 
           <div className="mb-8">
-            {/* 🌟 換回原本橘色的系統公告 */}
             <span className="bg-orange-500/20 text-orange-400 border border-orange-500/40 px-6 py-2 rounded-full text-lg font-bold">
               📢 每週六晚上 18:00 開放下一週報名
             </span>
@@ -197,7 +194,6 @@ export default function QiXianPickleball() {
 
         <div className="grid lg:grid-cols-5 gap-10">
           <div className="lg:col-span-2">
-            {/* 🌟 判斷是否開放，並顯示對應的畫面 */}
             {!isRegistrationOpen ? (
               <div className="bg-slate-800/50 p-10 rounded-[3rem] border border-slate-700 text-center shadow-inner">
                 <p className="text-2xl font-bold text-slate-400 italic">尚未開放報名</p>
