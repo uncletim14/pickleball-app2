@@ -66,12 +66,12 @@ export default function QiXianPickleball() {
   const isRegistrationOpen = now.getDay() !== 6 || now.getHours() >= 18; 
   const isExpired = now.getTime() > selectedDay.dateObj.getTime() + (22 * 60 * 60 * 1000);
   
-  // 🌟 核心修改：將週一 (mon_special) 新手區的 isClosed 改回 false，名額為 8 人
+  // 🌟 修改點：將週一 (mon_special) 新手區的 isClosed 重新改回 true
   const getCategories = (dayType: string) => {
     if (dayType === 'thu_special') return [{ id: 'sanda', label: '散打區', subLabel: 'OPEN PLAY', max: 24, isClosed: false }];
     if (dayType === 'mon_special') return [
       { id: 'sanda', label: '散打區', subLabel: 'OPEN PLAY', max: 16, isClosed: false },
-      { id: 'newbie', label: '新手區', subLabel: 'BEGINNER FRIENDLY', max: 8, isClosed: false }, // 恢復開放
+      { id: 'newbie', label: '新手區', subLabel: 'BEGINNER FRIENDLY', max: 8, isClosed: true }, // 👈 這裡重新鎖定為 true
     ];
     return [
       { id: 'sanda', label: '散打區', subLabel: 'OPEN PLAY', max: 16, isClosed: false },
