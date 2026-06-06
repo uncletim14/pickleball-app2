@@ -66,7 +66,7 @@ export default function QiXianPickleball() {
   const isRegistrationOpen = now.getDay() !== 6 || now.getHours() >= 18; 
   const isExpired = now.getTime() > selectedDay.dateObj.getTime() + (22 * 60 * 60 * 1000);
   
-  // 🌟 核心人數微調邏輯
+  // 🌟 人數限制邏輯
   const getCategories = (dayType: string) => {
     // 週四散打 20位
     if (dayType === 'thu_special') return [{ id: 'sanda', label: '散打區', subLabel: 'OPEN PLAY', max: 20, isClosed: false }];
@@ -77,7 +77,7 @@ export default function QiXianPickleball() {
       { id: 'newbie', label: '新手區', subLabel: 'BEGINNER FRIENDLY', max: 8, isClosed: false },
     ];
     
-    // 週五（預設正常）散打 10位，新手 8位
+    // 週五 散打 10位，新手 8位
     return [
       { id: 'sanda', label: '散打區', subLabel: 'OPEN PLAY', max: 10, isClosed: false },
       { id: 'newbie', label: '新手區', subLabel: 'BEGINNER FRIENDLY', max: 8, isClosed: false },
@@ -110,7 +110,7 @@ export default function QiXianPickleball() {
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isRegistrationOpen) { alert("報名尚未開放！請於週六 18:00 後再來。"); return; }
-    if (isExpired) { alert("該场次已結束！"); return; }
+    if (isExpired) { alert("該場次已結束！"); return; }
     
     const regCount = parseInt(formData.count);
     const trimmedName = formData.name.trim();
@@ -131,6 +131,8 @@ export default function QiXianPickleball() {
   };
 
   const currentGroup = participants.filter(p => p.day_key === selectedDay.key && p.category === activeTab);
+  
+  // 🌟 修正點：這裡的預設分母從 16 改成 10，讓抓不到資料時能正確顯示新限制
   const currentMax = categories.find(c => c.label === activeTab)?.max || 10;
   
   let runningTotal = 0;
@@ -213,4 +215,72 @@ export default function QiXianPickleball() {
               <form onSubmit={handleRegister} className="bg-slate-800 p-10 rounded-[3rem] space-y-6 border border-slate-700 shadow-2xl relative overflow-hidden">
                 <div className="absolute top-0 right-0 bg-emerald-500 text-slate-900 px-4 py-1 font-black text-xs uppercase">Open</div>
                 <h2 className="font-black text-3xl text-white mb-4 italic uppercase">快速報名</h2>
-                <div className="
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-sm text-slate-500 font-black tracking-widest uppercase italic">1. 人數</label>
+                    <select value={formData.count} onChange={e => setFormData({...formData, count: e.target.value})} className="w-full bg-slate-900 p-6 rounded-2xl border border-slate-700 text-2xl font-black text-white appearance-none mt-2">
+                      {[1,2,3,4].map(n => <option key={n} value={n}>{n} 位</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-sm text-slate-500 font-black tracking-widest uppercase italic">2. 代表姓名</label>
+                    <input type="text" required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} placeholder="代表姓名" className="w-full bg-slate-900 p-6 rounded-2xl border border-slate-700 text-2xl font-black text-white mt-2" />
+                  </div>
+                  <div>
+                    <label className="text-sm text-yellow-400 font-black tracking-widest uppercase italic">3. 密碼 (4 碼)</label>
+                    <input type="password" maxLength={4} required value={formData.edit_code} onChange={e => setFormData({...formData, edit_code: e.target.value})} placeholder="修改取消用" className="w-full bg-slate-900 p-6 rounded-2xl border border-slate-700 text-2xl font-black text-white mt-2" />
+                  </div>
+                  <button className="w-full bg-emerald-500 py-6 rounded-2xl font-black text-3xl hover:bg-emerald-400 text-white transition-all active:scale-95 shadow-lg shadow-emerald-500/20 uppercase italic">確認報名</button>
+                </div>
+              </form>
+            )}
+          </div>
+
+          <div className="lg:col-span-3">
+            <div className="flex justify-between items-center mb-8 px-4">
+              <h2 className="font-black text-4xl italic tracking-tighter uppercase text-white">報名清單</h2>
+              <span className="bg-slate-800 px-6 py-3 rounded-full text-xl text-slate-400 font-black">
+                正取：{confirmedTotal} / {currentMax}
+              </span>
+            </div>
+            <div className="space-y-4">
+              {listWithStatus.map((p) => (
+                <div key={p.id} className="bg-slate-800/60 p-5 rounded-[2rem] flex flex-col sm:flex-row justify-between items-center border-2 border-slate-800 hover:border-emerald-500/50 transition-all gap-4 shadow-xl">
+                  <div className="flex items-center gap-6 w-full sm:w-auto">
+                    <span className={`text-xl font-black px-5 py-2 rounded-xl shrink-0 w-24 text-center ${ p.status === '備取' ? 'bg-orange-500 text-white shadow-lg' : 'bg-emerald-500 text-white shadow-lg'}`}>
+                      {p.status}
+                    </span>
+                    <div className="flex items-baseline gap-4">
+                      <span className="font-black text-4xl text-white tracking-tight">{p.name}</span>
+                      <span className="text-2xl text-emerald-400 font-black">{p.count}位</span>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 w-full sm:w-auto">
+                    <button disabled={isExpired || !isRegistrationOpen} onClick={async () => {
+                        const code = window.prompt("請輸入密碼：");
+                        if (code === p.edit_code) {
+                          const newCount = parseInt(window.prompt("新人數 (1-4)：", p.count.toString()) || "");
+                          if (!isNaN(newCount)) {
+                            await supabase.from('tournament_participants').update({ count: newCount }).eq('id', p.id);
+                            fetchParticipants();
+                          }
+                        } else if (code) alert("密碼錯誤！");
+                    }} className={`text-xl px-5 py-2 rounded-xl font-black w-24 ${isExpired || !isRegistrationOpen ? 'bg-slate-800 text-slate-600 cursor-not-allowed' : 'bg-slate-700 text-white hover:bg-slate-600'}`}>修改</button>
+                    <button disabled={isExpired || !isRegistrationOpen} onClick={async () => {
+                        const code = window.prompt("請輸入密碼：");
+                        if (code === p.edit_code && window.confirm("確定取消報名？")) {
+                          await supabase.from('tournament_participants').delete().eq('id', p.id);
+                          fetchParticipants();
+                        }
+                    }} className={`text-xl px-5 py-2 rounded-xl font-black border-2 w-24 ${isExpired || !isRegistrationOpen ? 'border-slate-800 text-slate-600 cursor-not-allowed' : 'border-red-900/50 text-red-500 bg-red-900/30 hover:bg-red-900/50'}`}>取消</button>
+                  </div>
+                </div>
+              ))}
+              {listWithStatus.length === 0 && <div className="text-center py-24 text-slate-700 font-black text-3xl italic">目前尚無人報名</div>}
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  );
+}
