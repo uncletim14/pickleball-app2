@@ -66,18 +66,14 @@ export default function QiXianPickleball() {
   const isRegistrationOpen = now.getDay() !== 6 || now.getHours() >= 18; 
   const isExpired = now.getTime() > selectedDay.dateObj.getTime() + (22 * 60 * 60 * 1000);
   
-  // 🌟 最新人數與開放限制邏輯
   const getCategories = (dayType: string) => {
-    // 週四：散打區 24位
     if (dayType === 'thu_special') return [{ id: 'sanda', label: '散打區', subLabel: 'OPEN PLAY', max: 24, isClosed: false }];
     
-    // 週一：維持一樣（散打 10位，新手 8位正常開放）
     if (dayType === 'mon_special') return [
       { id: 'sanda', label: '散打區', subLabel: 'OPEN PLAY', max: 10, isClosed: false },
       { id: 'newbie', label: '新手區', subLabel: 'BEGINNER FRIENDLY', max: 8, isClosed: false },
     ];
     
-    // 週五：散打 16位，新手區不開放（isClosed: true）
     if (dayType === 'fri_special') return [
       { id: 'sanda', label: '散打區', subLabel: 'OPEN PLAY', max: 16, isClosed: false },
       { id: 'newbie', label: '新手區', subLabel: 'BEGINNER FRIENDLY', max: 8, isClosed: true },
@@ -136,8 +132,6 @@ export default function QiXianPickleball() {
   };
 
   const currentGroup = participants.filter(p => p.day_key === selectedDay.key && p.category === activeTab);
-  
-  // 預設分母防呆機制，找不到時預設為 10
   const currentMax = categories.find(c => c.label === activeTab)?.max || 10;
   
   let runningTotal = 0;
@@ -151,7 +145,9 @@ export default function QiXianPickleball() {
       return { ...p, status: '正取' };
     }
   });
-  const confirmedTotal = listWithStatus.filter(p => status === '正取').reduce((sum, p) => sum + p.count, 0);
+
+  // 🌟 已修正：將 status === '正取' 修改為 p.status === '正取'，讓計數器活過來
+  const confirmedTotal = listWithStatus.filter(p => p.status === '正取').reduce((sum, p) => sum + p.count, 0);
 
   return (
     <main className="min-h-screen bg-slate-900 p-4 md:p-8 text-slate-100 font-sans tracking-tight">
