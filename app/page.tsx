@@ -88,7 +88,7 @@ export default function QiXianPickleball() {
 
     // 週六：全新開場！散打區 24位
     if (dayType === 'sat_special') return [
-      { id: 'sanda', label: '散打區', subLabel: 'OPEN PLAY', max: 24, isClosed: false }
+      { id: 'sanda', label: '散打區', subLabel: 'OPEN PLAY', max: 16, isClosed: false }
     ];
 
     return [
