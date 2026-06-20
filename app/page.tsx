@@ -73,7 +73,7 @@ export default function QiXianPickleball() {
   const getCategories = (dayType: string) => {
     // 週一：僅剩散打區 10位
     if (dayType === 'mon_special') return [
-      { id: 'sanda', label: '散打區', subLabel: 'OPEN PLAY', max: 10, isClosed: false }
+      { id: 'sanda', label: '散打區', subLabel: 'OPEN PLAY', max: 16, isClosed: false }
     ];
 
     // 週四：散打區 24位
