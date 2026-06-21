@@ -72,7 +72,7 @@ export default function QiXianPickleball() {
   
   const getCategories = (dayType: string) => {
     if (dayType === 'mon_special') return [
-      { id: 'sanda', label: '散打區', subLabel: 'OPEN PLAY', max: 10, isClosed: false }
+      { id: 'sanda', label: '散打區', subLabel: 'OPEN PLAY', max: 16, isClosed: false }
     ];
 
     if (dayType === 'thu_special') return [
