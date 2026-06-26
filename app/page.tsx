@@ -29,6 +29,7 @@ export default function QiXianPickleball() {
     const dayOfWeek = now.getDay(); 
     const hour = now.getHours();
 
+    // 🌟 已修正：只有在週六晚上 22 點（含）之後，或是週日，網頁日期才會切換到下週
     const isNextWeekCycle = (dayOfWeek === 6 && hour >= 22) || dayOfWeek === 0;
     
     const baseMon = new Date(now);
@@ -65,10 +66,20 @@ export default function QiXianPickleball() {
   const dayOptions = getUpcomingDates();
   const [selectedDay, setSelectedDay] = useState(dayOptions[0]);
 
-  const isRegistrationOpen = now.getDay() !== 6 || now.getHours() >= 22; 
+  // 🌟 已修正：判定目前選取的日期「是不是未來的新場次」。如果是舊場次或今天當天場次，就不受22點的限制
+  const isTargetInNextCycle = () => {
+    const today = new Date(now);
+    today.setHours(0,0,0,0);
+    return selectedDay.dateObj.getTime() > today.getTime() + (6 * 24 * 60 * 60 * 1000);
+  };
+
+  // 🌟 只有當選取的是「下一週新場次」且現在還沒到週六 22:00，才需要鎖定表單
+  const isRegistrationOpen = !(isTargetInNextCycle() && (now.getDay() === 6 && now.getHours() < 22)); 
   
-  // 🌟 已修正：18.5 小時等於 18 小時 30 分鐘，代表當天過 18:30 就截止新增報名
+  // 🌟 當天過 18:30 後，isExpired 成立，關閉新增報名表單
   const isExpired = now.getTime() > selectedDay.dateObj.getTime() + (18.5 * 60 * 60 * 1000);
+  // 🌟 當天晚上 19:00 後，徹底關閉該場次的修改與取消功能
+  const isAfter1900 = now.getTime() > selectedDay.dateObj.getTime() + (19 * 60 * 60 * 1000);
   
   const getCategories = (dayType: string) => {
     if (dayType === 'mon_special') return [
@@ -117,7 +128,7 @@ export default function QiXianPickleball() {
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isRegistrationOpen) { alert("報名尚未開放！請於週六 22:00 後再來。"); return; }
+    if (!isRegistrationOpen) { alert("該場次尚未開放報名！請等候週六 22:00 開放。"); return; }
     if (isExpired) { alert("該場次已截止報名！(每日 18:30 截止)"); return; }
     
     const regCount = parseInt(formData.count);
@@ -177,7 +188,7 @@ export default function QiXianPickleball() {
               📢 每週六晚上 22:00 開放下一週報名
             </span>
             <span className="bg-red-500/10 text-red-400 border border-red-500/30 px-5 py-1 rounded-full text-sm font-bold">
-              ⚠️ 各場次於當天傍晚 18:30 截止新增報名
+              ⚠️ 各場次於當天 18:30 截止新增報名，19:00 後關閉修改/取消
             </span>
           </div>
 
@@ -213,13 +224,18 @@ export default function QiXianPickleball() {
           <div className="lg:col-span-2">
             {!isRegistrationOpen ? (
               <div className="bg-slate-800/50 p-10 rounded-[3rem] border border-slate-700 text-center shadow-inner">
-                <p className="text-2xl font-bold text-slate-400 italic">尚未開放報名</p>
-                <p className="text-slate-500 mt-2">請於今日 22:00 後再來</p>
+                <p className="text-2xl font-bold text-slate-400 italic">新場次尚未開放報名</p>
+                <p className="text-slate-500 mt-2">請於本週六 22:00 後再來</p>
+              </div>
+            ) : isAfter1900 ? (
+              <div className="bg-slate-800/50 p-10 rounded-[3rem] border border-slate-700 text-center shadow-inner">
+                <p className="text-2xl font-bold text-slate-500 italic text-white uppercase">活動已開打 / 結束</p>
+                <p className="text-slate-500 mt-2 italic text-sm">晚上 19:00 後已關閉所有更動</p>
               </div>
             ) : isExpired ? (
               <div className="bg-slate-800/50 p-10 rounded-[3rem] border border-slate-700 text-center shadow-inner">
                 <p className="text-2xl font-bold text-red-400 italic text-white uppercase">已截止報名</p>
-                <p className="text-slate-500 mt-2 italic text-sm">當天 18:30 後僅限修改/取消</p>
+                <p className="text-slate-500 mt-2 italic text-sm">18:30 後僅限代表密碼修改/取消</p>
               </div>
             ) : (
               <form onSubmit={handleRegister} className="bg-slate-800 p-10 rounded-[3rem] space-y-6 border border-slate-700 shadow-2xl relative overflow-hidden">
@@ -266,8 +282,8 @@ export default function QiXianPickleball() {
                     </div>
                   </div>
                   <div className="flex gap-2 w-full sm:w-auto">
-                    {/* 🌟 這裡移除了修改和取消按鈕對 isExpired 的禁用，讓 18:30 後依然能修改取消 */}
-                    <button disabled={!isRegistrationOpen} onClick={async () => {
+                    {/* 🌟 19點後 (isAfter1900) 按鈕將徹底禁用，18:30 - 19:00 間仍可正常修改取消 */}
+                    <button disabled={isAfter1900} onClick={async () => {
                         const code = window.prompt("請輸入密碼：");
                         if (code === p.edit_code) {
                           const newCount = parseInt(window.prompt("新人數 (1-4)：", p.count.toString()) || "");
@@ -276,14 +292,14 @@ export default function QiXianPickleball() {
                             fetchParticipants();
                           }
                         } else if (code) alert("密碼錯誤！");
-                    }} className={`text-xl px-5 py-2 rounded-xl font-black w-24 ${!isRegistrationOpen ? 'bg-slate-800 text-slate-600 cursor-not-allowed' : 'bg-slate-700 text-white hover:bg-slate-600'}`}>修改</button>
-                    <button disabled={!isRegistrationOpen} onClick={async () => {
+                    }} className={`text-xl px-5 py-2 rounded-xl font-black w-24 ${isAfter1900 ? 'bg-slate-800 text-slate-600 cursor-not-allowed' : 'bg-slate-700 text-white hover:bg-slate-600'}`}>修改</button>
+                    <button disabled={isAfter1900} onClick={async () => {
                         const code = window.prompt("請輸入密碼：");
                         if (code === p.edit_code && window.confirm("確定取消報名？")) {
                           await supabase.from('tournament_participants').delete().eq('id', p.id);
                           fetchParticipants();
                         }
-                    }} className={`text-xl px-5 py-2 rounded-xl font-black border-2 w-24 ${!isRegistrationOpen ? 'border-slate-800 text-slate-600 cursor-not-allowed' : 'border-red-900/50 text-red-500 bg-red-900/30 hover:bg-red-900/50'}`}>取消</button>
+                    }} className={`text-xl px-5 py-2 rounded-xl font-black border-2 w-24 ${isAfter1900 ? 'border-slate-800 text-slate-600 cursor-not-allowed' : 'border-red-900/50 text-red-500 bg-red-900/30 hover:bg-red-900/50'}`}>取消</button>
                   </div>
                 </div>
               ))}
