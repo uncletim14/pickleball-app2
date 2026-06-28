@@ -29,7 +29,6 @@ export default function QiXianPickleball() {
     const dayOfWeek = now.getDay(); 
     const hour = now.getHours();
 
-    // 🌟 已修正：只有在週六晚上 22 點（含）之後，或是週日，網頁日期才會切換到下週
     const isNextWeekCycle = (dayOfWeek === 6 && hour >= 22) || dayOfWeek === 0;
     
     const baseMon = new Date(now);
@@ -66,40 +65,41 @@ export default function QiXianPickleball() {
   const dayOptions = getUpcomingDates();
   const [selectedDay, setSelectedDay] = useState(dayOptions[0]);
 
-  // 🌟 已修正：判定目前選取的日期「是不是未來的新場次」。如果是舊場次或今天當天場次，就不受22點的限制
   const isTargetInNextCycle = () => {
     const today = new Date(now);
     today.setHours(0,0,0,0);
     return selectedDay.dateObj.getTime() > today.getTime() + (6 * 24 * 60 * 60 * 1000);
   };
 
-  // 🌟 只有當選取的是「下一週新場次」且現在還沒到週六 22:00，才需要鎖定表單
   const isRegistrationOpen = !(isTargetInNextCycle() && (now.getDay() === 6 && now.getHours() < 22)); 
   
-  // 🌟 當天過 18:30 後，isExpired 成立，關閉新增報名表單
   const isExpired = now.getTime() > selectedDay.dateObj.getTime() + (18.5 * 60 * 60 * 1000);
-  // 🌟 當天晚上 19:00 後，徹底關閉該場次的修改與取消功能
   const isAfter1900 = now.getTime() > selectedDay.dateObj.getTime() + (19 * 60 * 60 * 1000);
   
+  // 🌟 人數修正邏輯（週一改 16 人、週四改 28 人）
   const getCategories = (dayType: string) => {
+    // 週一：名額調升至 16 位 🌟
     if (dayType === 'mon_special') return [
-      { id: 'sanda', label: '散打區', subLabel: 'OPEN PLAY', max: 10, isClosed: false }
+      { id: 'sanda', label: '散打區', subLabel: 'OPEN PLAY', max: 16, isClosed: false }
     ];
 
+    // 週四：名額調升至 28 位 🌟
     if (dayType === 'thu_special') return [
-      { id: 'sanda', label: '散打區', subLabel: 'OPEN PLAY', max: 24, isClosed: false }
+      { id: 'sanda', label: '散打區', subLabel: 'OPEN PLAY', max: 28, isClosed: false }
     ];
     
+    // 週五：維持 16 位
     if (dayType === 'fri_special') return [
       { id: 'sanda', label: '散打區', subLabel: 'OPEN PLAY', max: 16, isClosed: false }
     ];
 
+    // 週六：維持 16 位
     if (dayType === 'sat_special') return [
       { id: 'sanda', label: '散打區', subLabel: 'OPEN PLAY', max: 16, isClosed: false }
     ];
 
     return [
-      { id: 'sanda', label: '散打區', subLabel: 'OPEN PLAY', max: 10, isClosed: false }
+      { id: 'sanda', label: '散打區', subLabel: 'OPEN PLAY', max: 16, isClosed: false }
     ];
   };
 
@@ -150,7 +150,7 @@ export default function QiXianPickleball() {
   };
 
   const currentGroup = participants.filter(p => p.day_key === selectedDay.key && p.category === activeTab);
-  const currentMax = categories.find(c => c.label === activeTab)?.max || 10;
+  const currentMax = categories.find(c => c.label === activeTab)?.max || 16;
   
   let runningTotal = 0;
   let hasMetWaitlist = false; 
@@ -282,7 +282,6 @@ export default function QiXianPickleball() {
                     </div>
                   </div>
                   <div className="flex gap-2 w-full sm:w-auto">
-                    {/* 🌟 19點後 (isAfter1900) 按鈕將徹底禁用，18:30 - 19:00 間仍可正常修改取消 */}
                     <button disabled={isAfter1900} onClick={async () => {
                         const code = window.prompt("請輸入密碼：");
                         if (code === p.edit_code) {
