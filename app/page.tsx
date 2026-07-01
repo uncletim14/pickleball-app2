@@ -76,26 +76,25 @@ export default function QiXianPickleball() {
   const isExpired = now.getTime() > selectedDay.dateObj.getTime() + (18.5 * 60 * 60 * 1000);
   const isAfter1900 = now.getTime() > selectedDay.dateObj.getTime() + (19 * 60 * 60 * 1000);
   
-  // 🌟 人數修正邏輯（週一改 16 人、週四改 28 人）
   const getCategories = (dayType: string) => {
-    // 週一：名額調升至 16 位 🌟
+    // 週一：16 位
     if (dayType === 'mon_special') return [
       { id: 'sanda', label: '散打區', subLabel: 'OPEN PLAY', max: 16, isClosed: false }
     ];
 
-    // 週四：名額調升至 28 位 🌟
+    // 週四：28 位
     if (dayType === 'thu_special') return [
       { id: 'sanda', label: '散打區', subLabel: 'OPEN PLAY', max: 28, isClosed: false }
     ];
     
-    // 週五：維持 16 位
+    // 週五：16 位
     if (dayType === 'fri_special') return [
       { id: 'sanda', label: '散打區', subLabel: 'OPEN PLAY', max: 16, isClosed: false }
     ];
 
-    // 週六：維持 16 位
+    // 週六：修正為 10 位 🌟
     if (dayType === 'sat_special') return [
-      { id: 'sanda', label: '散打區', subLabel: 'OPEN PLAY', max: 16, isClosed: false }
+      { id: 'sanda', label: '散打區', subLabel: 'OPEN PLAY', max: 10, isClosed: false }
     ];
 
     return [
@@ -155,7 +154,7 @@ export default function QiXianPickleball() {
   let runningTotal = 0;
   let hasMetWaitlist = false; 
   const listWithStatus = currentGroup.map(p => {
-    if (hasMetWaitlist || (runningTotal + p.count > currentMax)) {
+    if (hasMetMetWaitlist || (runningTotal + p.count > currentMax)) {
       hasMetWaitlist = true; 
       return { ...p, status: '備取' };
     } else {
