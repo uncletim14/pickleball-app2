@@ -77,22 +77,18 @@ export default function QiXianPickleball() {
   const isAfter1900 = now.getTime() > selectedDay.dateObj.getTime() + (19 * 60 * 60 * 1000);
   
   const getCategories = (dayType: string) => {
-    // 週一：16 位
     if (dayType === 'mon_special') return [
       { id: 'sanda', label: '散打區', subLabel: 'OPEN PLAY', max: 16, isClosed: false }
     ];
 
-    // 週四：28 位
     if (dayType === 'thu_special') return [
       { id: 'sanda', label: '散打區', subLabel: 'OPEN PLAY', max: 28, isClosed: false }
     ];
     
-    // 週五：16 位
     if (dayType === 'fri_special') return [
       { id: 'sanda', label: '散打區', subLabel: 'OPEN PLAY', max: 16, isClosed: false }
     ];
 
-    // 週六：修正為 10 位 🌟
     if (dayType === 'sat_special') return [
       { id: 'sanda', label: '散打區', subLabel: 'OPEN PLAY', max: 10, isClosed: false }
     ];
@@ -154,7 +150,8 @@ export default function QiXianPickleball() {
   let runningTotal = 0;
   let hasMetWaitlist = false; 
   const listWithStatus = currentGroup.map(p => {
-    if (hasMetMetWaitlist || (runningTotal + p.count > currentMax)) {
+    // 🌟 已修正：將原本手誤打錯的 hasMetMetWaitlist 改回正確的 hasMetWaitlist
+    if (hasMetWaitlist || (runningTotal + p.count > currentMax)) {
       hasMetWaitlist = true; 
       return { ...p, status: '備取' };
     } else {
