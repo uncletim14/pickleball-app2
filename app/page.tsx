@@ -77,28 +77,28 @@ export default function QiXianPickleball() {
   const isAfter1900 = now.getTime() > selectedDay.dateObj.getTime() + (19 * 60 * 60 * 1000);
   
   const getCategories = (dayType: string) => {
-    // 週一：維持 16 位
+    // 下週一：修正為 18 位 🌟
     if (dayType === 'mon_special') return [
-      { id: 'sanda', label: '散打區', subLabel: 'OPEN PLAY', max: 16, isClosed: false }
+      { id: 'sanda', label: '散打區', subLabel: 'OPEN PLAY', max: 18, isClosed: false }
     ];
 
-    // 週四：維持 28 位
+    // 下週四：維持 28 位
     if (dayType === 'thu_special') return [
       { id: 'sanda', label: '散打區', subLabel: 'OPEN PLAY', max: 28, isClosed: false }
     ];
     
-    // 週五：維持 20 位
+    // 下週五：修正為 18 位 🌟
     if (dayType === 'fri_special') return [
-      { id: 'sanda', label: '散打區', subLabel: 'OPEN PLAY', max: 20, isClosed: false }
+      { id: 'sanda', label: '散打區', subLabel: 'OPEN PLAY', max: 18, isClosed: false }
     ];
 
-    // 週六：修正為 16 位 🌟
+    // 下週六：維持 16 位
     if (dayType === 'sat_special') return [
       { id: 'sanda', label: '散打區', subLabel: 'OPEN PLAY', max: 16, isClosed: false }
     ];
 
     return [
-      { id: 'sanda', label: '散打區', subLabel: 'OPEN PLAY', max: 16, isClosed: false }
+      { id: 'sanda', label: '散打區', subLabel: 'OPEN PLAY', max: 18, isClosed: false }
     ];
   };
 
@@ -149,7 +149,7 @@ export default function QiXianPickleball() {
   };
 
   const currentGroup = participants.filter(p => p.day_key === selectedDay.key && p.category === activeTab);
-  const currentMax = categories.find(c => c.label === activeTab)?.max || 16;
+  const currentMax = categories.find(c => c.label === activeTab)?.max || 18;
   
   let runningTotal = 0;
   let hasMetWaitlist = false; 
