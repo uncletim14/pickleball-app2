@@ -1,3 +1,4 @@
+// app/page.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -15,6 +16,7 @@ type Participant = {
   day_key: string;
   edit_code: string;
   count: number;
+  is_present?: boolean; // 🌟 擴充：是否已到場
 };
 
 export default function QiXianPickleball() {
@@ -77,29 +79,11 @@ export default function QiXianPickleball() {
   const isAfter1900 = now.getTime() > selectedDay.dateObj.getTime() + (19 * 60 * 60 * 1000);
   
   const getCategories = (dayType: string) => {
-    // 下週一：維持 18 位
-    if (dayType === 'mon_special') return [
-      { id: 'sanda', label: '散打區', subLabel: 'OPEN PLAY', max: 18, isClosed: false }
-    ];
-
-    // 下週四：維持 28 位
-    if (dayType === 'thu_special') return [
-      { id: 'sanda', label: '散打區', subLabel: 'OPEN PLAY', max: 28, isClosed: false }
-    ];
-    
-    // 下週五：維持 18 位
-    if (dayType === 'fri_special') return [
-      { id: 'sanda', label: '散打區', subLabel: 'OPEN PLAY', max: 18, isClosed: false }
-    ];
-
-    // 下週六：修正為 8 位 🌟
-    if (dayType === 'sat_special') return [
-      { id: 'sanda', label: '散打區', subLabel: 'OPEN PLAY', max: 8, isClosed: false }
-    ];
-
-    return [
-      { id: 'sanda', label: '散打區', subLabel: 'OPEN PLAY', max: 18, isClosed: false }
-    ];
+    if (dayType === 'mon_special') return [{ id: 'sanda', label: '散打區', subLabel: 'OPEN PLAY', max: 18, isClosed: false }];
+    if (dayType === 'thu_special') return [{ id: 'sanda', label: '散打區', subLabel: 'OPEN PLAY', max: 28, isClosed: false }];
+    if (dayType === 'fri_special') return [{ id: 'sanda', label: '散打區', subLabel: 'OPEN PLAY', max: 18, isClosed: false }];
+    if (dayType === 'sat_special') return [{ id: 'sanda', label: '散打區', subLabel: 'OPEN PLAY', max: 8, isClosed: false }];
+    return [{ id: 'sanda', label: '散打區', subLabel: 'OPEN PLAY', max: 18, isClosed: false }];
   };
 
   const categories = getCategories(selectedDay.type);
@@ -200,17 +184,7 @@ export default function QiXianPickleball() {
 
         <div className="flex gap-4 mb-10">
           {categories.map(cat => (
-            <button 
-              key={cat.id} 
-              onClick={() => { if (!cat.isClosed) setActiveTab(cat.label); }} 
-              className={`flex-1 py-8 px-4 rounded-[2rem] transition-all border-4 flex flex-col items-center justify-center ${
-                activeTab === cat.label 
-                  ? 'bg-slate-800 border-emerald-500 text-emerald-400 shadow-xl' 
-                  : cat.isClosed
-                    ? 'bg-slate-900 border-slate-800/50 text-slate-600 cursor-not-allowed'
-                    : 'bg-slate-900 border-slate-800 text-slate-700 hover:bg-slate-800'
-              }`}
-            >
+            <button key={cat.id} onClick={() => { if (!cat.isClosed) setActiveTab(cat.label); }} className={`flex-1 py-8 px-4 rounded-[2rem] transition-all border-4 flex flex-col items-center justify-center ${activeTab === cat.label ? 'bg-slate-800 border-emerald-500 text-emerald-400 shadow-xl' : cat.isClosed ? 'bg-slate-900 border-slate-800/50 text-slate-600 cursor-not-allowed' : 'bg-slate-900 border-slate-800 text-slate-700 hover:bg-slate-800'}`}>
               <span className="text-4xl font-black mb-2">{cat.label}</span>
               <span className={`text-xl font-black ${cat.isClosed ? 'text-red-500/80' : 'opacity-90'}`}>
                 {cat.isClosed ? '這周未開放' : `(${cat.max}人)`}
@@ -272,11 +246,12 @@ export default function QiXianPickleball() {
               {listWithStatus.map((p) => (
                 <div key={p.id} className="bg-slate-800/60 p-5 rounded-[2rem] flex flex-col sm:flex-row justify-between items-center border-2 border-slate-800 hover:border-emerald-500/50 transition-all gap-4 shadow-xl">
                   <div className="flex items-center gap-6 w-full sm:w-auto">
-                    <span className={`text-xl font-black px-5 py-2 rounded-xl shrink-0 w-24 text-center ${ p.status === '備取' ? 'bg-orange-500 text-white shadow-lg' : 'bg-emerald-500 text-white shadow-lg'}`}>
-                      {p.status}
+                    {/* 🌟 亮燈狀態：如果 p.is_present 是 true 就顯示藍色 [已到場]，否則正常顯示正取/備取 */}
+                    <span className={`text-xl font-black px-5 py-2 rounded-xl shrink-0 w-26 text-center ${p.is_present ? 'bg-blue-600 text-white shadow-md animate-pulse' : p.status === '備取' ? 'bg-orange-500 text-white shadow-lg' : 'bg-emerald-500 text-white shadow-lg'}`}>
+                      {p.is_present ? '已到場' : p.status}
                     </span>
                     <div className="flex items-baseline gap-4">
-                      <span className="font-black text-4xl text-white tracking-tight">{p.name}</span>
+                      <span className={`font-black text-4xl tracking-tight ${p.is_present ? 'text-slate-400 line-through' : 'text-white'}`}>{p.name}</span>
                       <span className="text-2xl text-emerald-400 font-black">{p.count}位</span>
                     </div>
                   </div>
