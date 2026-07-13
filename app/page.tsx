@@ -1,4 +1,3 @@
-// app/page.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -16,7 +15,8 @@ type Participant = {
   day_key: string;
   edit_code: string;
   count: number;
-  is_present?: boolean; // 🌟 擴充：是否已到場
+  is_present?: boolean;
+  created_at?: string; 
 };
 
 export default function QiXianPickleball() {
@@ -121,6 +121,33 @@ export default function QiXianPickleball() {
     const isDuplicate = participants.some(p => p.day_key === selectedDay.key && p.category === activeTab && p.name.toLowerCase() === trimmedName.toLowerCase());
     if (isDuplicate) { alert(`「${trimmedName}」已報名過此場次！`); return; }
 
+    // 🌟 安全優化：計算 30 天內未到次數，但「自動切齊上線日」避免誤判舊資料
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    
+    // 設定功能今天正式啟動 (2026-07-13)
+    const featureLaunchDate = new Date('2026-07-13T00:00:00');
+    // 如果 30 天前比上線日還要早，就以上線日為準；如果未來過了一個月，就會正常倒推 30 天
+    const startDate = thirtyDaysAgo > featureLaunchDate ? thirtyDaysAgo : featureLaunchDate;
+    const isoStartDate = startDate.toISOString();
+
+    const { data: historyData, error: historyError } = await supabase
+      .from('tournament_participants')
+      .select('*')
+      .eq('name', trimmedName)
+      .eq('is_present', false) 
+      .gte('created_at', isoStartDate); 
+
+    let absentCount = 0;
+    if (!historyError && historyData) {
+      const rightNow = new Date();
+      absentCount = historyData.filter(p => {
+        const matchDate = new Date(p.day_key);
+        matchDate.setHours(19, 0, 0, 0);
+        return rightNow.getTime() > matchDate.getTime();
+      }).length;
+    }
+
     const { error } = await supabase.from('tournament_participants').insert([{
       name: trimmedName, category: activeTab, day_key: selectedDay.key, edit_code: formData.edit_code, count: regCount
     }]);
@@ -128,7 +155,12 @@ export default function QiXianPickleball() {
     if (!error) {
       setFormData({ name: '', edit_code: '', count: '1' });
       fetchParticipants();
-      alert("報名成功！");
+      
+      if (absentCount > 0) {
+        alert(`🎉 報名成功！\n\n⚠️ 溫馨提醒：\n系統偵測到【${trimmedName}】在過去 30 天內共有 ${absentCount} 次「未到場報到」的紀錄。請球友記得準時出席，或於球聚當天 19:00 前線上取消，以免影響未來報名權限喔！`);
+      } else {
+        alert("🎉 報名成功！期待您的參與！");
+      }
     }
   };
 
@@ -246,8 +278,7 @@ export default function QiXianPickleball() {
               {listWithStatus.map((p) => (
                 <div key={p.id} className="bg-slate-800/60 p-5 rounded-[2rem] flex flex-col sm:flex-row justify-between items-center border-2 border-slate-800 hover:border-emerald-500/50 transition-all gap-4 shadow-xl">
                   <div className="flex items-center gap-6 w-full sm:w-auto">
-                    {/* 🌟 亮燈狀態：如果 p.is_present 是 true 就顯示藍色 [已到場]，否則正常顯示正取/備取 */}
-                    <span className={`text-xl font-black px-5 py-2 rounded-xl shrink-0 w-26 text-center ${p.is_present ? 'bg-blue-600 text-white shadow-md animate-pulse' : p.status === '備取' ? 'bg-orange-500 text-white shadow-lg' : 'bg-emerald-500 text-white shadow-lg'}`}>
+                    <span className={`text-xl font-black px-5 py-2 rounded-xl shrink-0 w-24 text-center ${p.is_present ? 'bg-blue-600 text-white shadow-md animate-pulse' : p.status === '備取' ? 'bg-orange-500 text-white shadow-lg' : 'bg-emerald-500 text-white shadow-lg'}`}>
                       {p.is_present ? '已到場' : p.status}
                     </span>
                     <div className="flex items-baseline gap-4">
