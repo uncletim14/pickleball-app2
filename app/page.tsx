@@ -66,6 +66,7 @@ export default function QiXianPickleball() {
 
   const dayOptions = getUpcomingDates();
   const [selectedDay, setSelectedDay] = useState(dayOptions[0]);
+  const [isCancelled, setIsCancelled] = useState<boolean>(false);
 
   const isTargetInNextCycle = () => {
     const today = new Date(now);
@@ -102,6 +103,7 @@ export default function QiXianPickleball() {
   useEffect(() => {
     document.title = "七賢國小匹克交流團報名系統";
     fetchParticipants();
+    fetchEventStatus();
   }, [selectedDay, activeTab]);
 
   const fetchParticipants = async () => {
@@ -109,8 +111,45 @@ export default function QiXianPickleball() {
     if (!error && data) setParticipants(data);
   };
 
+  const fetchEventStatus = async () => {
+    const { data } = await supabase.from('event_status').select('is_cancelled').eq('day_key', selectedDay.key).single();
+    if (data) {
+      setIsCancelled(data.is_cancelled);
+    } else {
+      setIsCancelled(false);
+    }
+  };
+
+  // 🌟 管理員密碼已更新為 8888
+  const handleToggleRainCancellation = async () => {
+    const adminPassword = window.prompt("請輸入提姆大叔管理員密碼：");
+    if (adminPassword !== '8888') {
+      alert("密碼錯誤！");
+      return;
+    }
+
+    const nextStatus = !isCancelled;
+    const actionText = nextStatus ? "【因雨取消】" : "【球敘正常】";
+
+    if (window.confirm(`確定要將 ${selectedDay.label} 設定為 ${actionText} 嗎？`)) {
+      await supabase.from('event_status').upsert({ day_key: selectedDay.key, is_cancelled: nextStatus });
+      
+      if (nextStatus) {
+        await supabase
+          .from('tournament_participants')
+          .update({ is_present: true })
+          .eq('day_key', selectedDay.key);
+      }
+
+      setIsCancelled(nextStatus);
+      fetchParticipants();
+      alert(`已將 ${selectedDay.label} 變更為 ${actionText}！`);
+    }
+  };
+
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isCancelled) { alert("本場次因雨取消，暫停報名！"); return; }
     if (!isRegistrationOpen) { alert("該場次尚未開放報名！請等候週六 22:00 開放。"); return; }
     if (isExpired) { alert("該場次已截止報名！(每日 18:30 截止)"); return; }
     
@@ -160,29 +199,6 @@ export default function QiXianPickleball() {
     }
   };
 
-  const handleRainCancellation = async () => {
-    const adminPassword = window.prompt("請輸入提姆大叔管理員密碼以確認因雨取消：");
-    if (adminPassword !== '7777') {
-      alert("密碼錯誤，無法啟動特赦！");
-      return;
-    }
-
-    if (window.confirm(`確定要將 ${selectedDay.label} 設為「因雨取消」嗎？系統將自動把此場次所有球友設為免扣分狀態。`)) {
-      const { error } = await supabase
-        .from('tournament_participants')
-        .update({ is_present: true })
-        .eq('day_key', selectedDay.key)
-        .eq('category', activeTab);
-
-      if (!error) {
-        alert("⛈️ 已成功判定因雨取消！此場次全體球友不計缺席。");
-        fetchParticipants();
-      } else {
-        alert("設定失敗，請稍後再試。");
-      }
-    }
-  };
-
   const currentGroup = participants.filter(p => p.day_key === selectedDay.key && p.category === activeTab);
   const currentMax = categories.find(c => c.label === activeTab)?.max || 18;
   
@@ -208,13 +224,21 @@ export default function QiXianPickleball() {
             <Image src="/七賢LOGO.png" alt="LOGO" width={80} height={80} className="rounded-full shadow-2xl" />
             <h1 className="text-4xl md:text-6xl font-black text-emerald-400 italic tracking-widest uppercase text-shadow-sm">七賢國小匹克交流團</h1>
           </div>
-          
-          <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-full px-8 py-3 mb-4 inline-block shadow-lg">
-            <div className="text-lg font-bold text-emerald-400 flex flex-wrap justify-center gap-x-8 gap-y-2">
-              <span>🕒 19:00 - 21:20</span>
-              <span>💰 $100 / 人</span>
-              <span>🏸 拍子租借 $50</span>
-            </div>
+
+          <div className="mb-6">
+            {isCancelled ? (
+              <div className="bg-red-500/20 border-2 border-red-500 text-red-400 rounded-full px-8 py-3 inline-block shadow-2xl animate-bounce">
+                <span className="text-2xl font-black tracking-wide">⛈️ 本場次因雨取消，球友不計缺席！</span>
+              </div>
+            ) : (
+              <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-full px-8 py-3 inline-block shadow-lg">
+                <div className="text-lg font-bold text-emerald-400 flex flex-wrap justify-center gap-x-8 gap-y-2">
+                  <span>🟢 今日球敘正常進行</span>
+                  <span>🕒 19:00 - 21:20</span>
+                  <span>💰 $100 / 人</span>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="mb-8 flex flex-col items-center gap-2">
@@ -246,7 +270,12 @@ export default function QiXianPickleball() {
 
         <div className="grid lg:grid-cols-5 gap-10">
           <div className="lg:col-span-2">
-            {!isRegistrationOpen ? (
+            {isCancelled ? (
+              <div className="bg-slate-800/50 p-10 rounded-[3rem] border border-red-500/30 text-center shadow-inner space-y-2">
+                <p className="text-3xl font-black text-red-400 italic">⛈️ 場次已取消</p>
+                <p className="text-slate-400 font-bold">因雨打不開，大家辛苦了！下週見！</p>
+              </div>
+            ) : !isRegistrationOpen ? (
               <div className="bg-slate-800/50 p-10 rounded-[3rem] border border-slate-700 text-center shadow-inner">
                 <p className="text-2xl font-bold text-slate-400 italic">新場次尚未開放報名</p>
                 <p className="text-slate-500 mt-2">請於本週六 22:00 後再來</p>
@@ -291,10 +320,14 @@ export default function QiXianPickleball() {
               <h2 className="font-black text-4xl italic tracking-tighter uppercase text-white">報名清單</h2>
               <div className="flex items-center gap-3">
                 <button 
-                  onClick={handleRainCancellation}
-                  className="bg-red-600/30 text-red-400 border border-red-500/40 px-4 py-2 rounded-xl text-sm font-black hover:bg-red-600 hover:text-white transition-all"
+                  onClick={handleToggleRainCancellation}
+                  className={`px-4 py-2 rounded-xl text-sm font-black transition-all border ${
+                    isCancelled 
+                      ? 'bg-red-600/30 text-red-400 border-red-500/50 hover:bg-red-600 hover:text-white' 
+                      : 'bg-emerald-600/20 text-emerald-400 border-emerald-500/40 hover:bg-emerald-600 hover:text-white'
+                  }`}
                 >
-                  ⛈️ 因雨取消此場
+                  {isCancelled ? '⛈️ 因雨取消中 (點擊恢復)' : '🟢 球敘正常 (點擊取消)'}
                 </button>
                 <span className="bg-slate-800 px-6 py-3 rounded-full text-xl text-slate-400 font-black">
                   正取：{confirmedTotal} / {currentMax}
@@ -314,13 +347,11 @@ export default function QiXianPickleball() {
                     </div>
                   </div>
                   <div className="flex gap-2 w-full sm:w-auto">
-                    <button disabled={isAfter1900} onClick={async () => {
+                    <button disabled={isAfter1900 || isCancelled} onClick={async () => {
                         const code = window.prompt("請輸入密碼：");
                         if (code === p.edit_code) {
                           const newCount = parseInt(window.prompt("新人數 (1-4)：", p.count.toString()) || "");
                           if (!isNaN(newCount) && newCount >= 1 && newCount <= 4) {
-                            
-                            // 🌟 升級邏輯：正取追加人數，若導致總數超過上限，警示並轉為備取
                             if (p.status === '正取' && newCount > p.count) {
                               const extraNeeded = newCount - p.count;
                               const currentRemaining = currentMax - confirmedTotal;
@@ -333,37 +364,29 @@ export default function QiXianPickleball() {
                                   `請問確定要追加人數並轉為備取嗎？`
                                 );
 
-                                if (!confirmChange) {
-                                  return; // 球友取消修改，維持原樣
-                                }
+                                if (!confirmChange) return;
 
-                                // 球友同意轉備取：重新刪除並新增，使其 ID 變成最新（排到最後一位備取）
                                 await supabase.from('tournament_participants').delete().eq('id', p.id);
                                 await supabase.from('tournament_participants').insert([{
-                                  name: p.name,
-                                  category: p.category,
-                                  day_key: p.day_key,
-                                  edit_code: p.edit_code,
-                                  count: newCount
+                                  name: p.name, category: p.category, day_key: p.day_key, edit_code: p.edit_code, count: newCount
                                 }]);
                                 fetchParticipants();
                                 return;
                               }
                             }
 
-                            // 正常修改人數 (減少人數，或正取名額還夠追加)
                             await supabase.from('tournament_participants').update({ count: newCount }).eq('id', p.id);
                             fetchParticipants();
                           }
                         } else if (code) alert("密碼錯誤！");
-                    }} className={`text-xl px-5 py-2 rounded-xl font-black w-24 ${isAfter1900 ? 'bg-slate-800 text-slate-600 cursor-not-allowed' : 'bg-slate-700 text-white hover:bg-slate-600'}`}>修改</button>
-                    <button disabled={isAfter1900} onClick={async () => {
+                    }} className={`text-xl px-5 py-2 rounded-xl font-black w-24 ${isAfter1900 || isCancelled ? 'bg-slate-800 text-slate-600 cursor-not-allowed' : 'bg-slate-700 text-white hover:bg-slate-600'}`}>修改</button>
+                    <button disabled={isAfter1900 || isCancelled} onClick={async () => {
                         const code = window.prompt("請輸入密碼：");
                         if (code === p.edit_code && window.confirm("確定取消報名？")) {
                           await supabase.from('tournament_participants').delete().eq('id', p.id);
                           fetchParticipants();
                         }
-                    }} className={`text-xl px-5 py-2 rounded-xl font-black border-2 w-24 ${isAfter1900 ? 'border-slate-800 text-slate-600 cursor-not-allowed' : 'border-red-900/50 text-red-500 bg-red-900/30 hover:bg-red-900/50'}`}>取消</button>
+                    }} className={`text-xl px-5 py-2 rounded-xl font-black border-2 w-24 ${isAfter1900 || isCancelled ? 'border-slate-800 text-slate-600 cursor-not-allowed' : 'border-red-900/50 text-red-500 bg-red-900/30 hover:bg-red-900/50'}`}>取消</button>
                   </div>
                 </div>
               ))}
