@@ -121,13 +121,9 @@ export default function QiXianPickleball() {
     const isDuplicate = participants.some(p => p.day_key === selectedDay.key && p.category === activeTab && p.name.toLowerCase() === trimmedName.toLowerCase());
     if (isDuplicate) { alert(`「${trimmedName}」已報名過此場次！`); return; }
 
-    // 🌟 安全優化：計算 30 天內未到次數，但「自動切齊上線日」避免誤判舊資料
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    
-    // 設定功能今天正式啟動 (2026-07-13)
     const featureLaunchDate = new Date('2026-07-13T00:00:00');
-    // 如果 30 天前比上線日還要早，就以上線日為準；如果未來過了一個月，就會正常倒推 30 天
     const startDate = thirtyDaysAgo > featureLaunchDate ? thirtyDaysAgo : featureLaunchDate;
     const isoStartDate = startDate.toISOString();
 
@@ -160,6 +156,29 @@ export default function QiXianPickleball() {
         alert(`🎉 報名成功！\n\n⚠️ 溫馨提醒：\n系統偵測到【${trimmedName}】在過去 30 天內共有 ${absentCount} 次「未到場報到」的紀錄。請球友記得準時出席，或於球聚當天 19:00 前線上取消，以免影響未來報名權限喔！`);
       } else {
         alert("🎉 報名成功！期待您的參與！");
+      }
+    }
+  };
+
+  const handleRainCancellation = async () => {
+    const adminPassword = window.prompt("請輸入提姆大叔管理員密碼以確認因雨取消：");
+    if (adminPassword !== '7777') {
+      alert("密碼錯誤，無法啟動特赦！");
+      return;
+    }
+
+    if (window.confirm(`確定要將 ${selectedDay.label} 設為「因雨取消」嗎？系統將自動把此場次所有球友設為免扣分狀態。`)) {
+      const { error } = await supabase
+        .from('tournament_participants')
+        .update({ is_present: true })
+        .eq('day_key', selectedDay.key)
+        .eq('category', activeTab);
+
+      if (!error) {
+        alert("⛈️ 已成功判定因雨取消！此場次全體球友不計缺席。");
+        fetchParticipants();
+      } else {
+        alert("設定失敗，請稍後再試。");
       }
     }
   };
@@ -270,15 +289,23 @@ export default function QiXianPickleball() {
           <div className="lg:col-span-3">
             <div className="flex justify-between items-center mb-8 px-4">
               <h2 className="font-black text-4xl italic tracking-tighter uppercase text-white">報名清單</h2>
-              <span className="bg-slate-800 px-6 py-3 rounded-full text-xl text-slate-400 font-black">
-                正取：{confirmedTotal} / {currentMax}
-              </span>
+              <div className="flex items-center gap-3">
+                <button 
+                  onClick={handleRainCancellation}
+                  className="bg-red-600/30 text-red-400 border border-red-500/40 px-4 py-2 rounded-xl text-sm font-black hover:bg-red-600 hover:text-white transition-all"
+                >
+                  ⛈️ 因雨取消此場
+                </button>
+                <span className="bg-slate-800 px-6 py-3 rounded-full text-xl text-slate-400 font-black">
+                  正取：{confirmedTotal} / {currentMax}
+                </span>
+              </div>
             </div>
             <div className="space-y-4">
               {listWithStatus.map((p) => (
                 <div key={p.id} className="bg-slate-800/60 p-5 rounded-[2rem] flex flex-col sm:flex-row justify-between items-center border-2 border-slate-800 hover:border-emerald-500/50 transition-all gap-4 shadow-xl">
                   <div className="flex items-center gap-6 w-full sm:w-auto">
-                    <span className={`text-xl font-black px-5 py-2 rounded-xl shrink-0 w-24 text-center ${p.is_present ? 'bg-blue-600 text-white shadow-md animate-pulse' : p.status === '備取' ? 'bg-orange-500 text-white shadow-lg' : 'bg-emerald-500 text-white shadow-lg'}`}>
+                    <span className={`text-xl font-black px-5 py-2 rounded-xl shrink-0 w-24 text-center ${p.is_present ? 'bg-blue-600 text-white shadow-md' : p.status === '備取' ? 'bg-orange-500 text-white shadow-lg' : 'bg-emerald-500 text-white shadow-lg'}`}>
                       {p.is_present ? '已到場' : p.status}
                     </span>
                     <div className="flex items-baseline gap-4">
@@ -291,7 +318,40 @@ export default function QiXianPickleball() {
                         const code = window.prompt("請輸入密碼：");
                         if (code === p.edit_code) {
                           const newCount = parseInt(window.prompt("新人數 (1-4)：", p.count.toString()) || "");
-                          if (!isNaN(newCount)) {
+                          if (!isNaN(newCount) && newCount >= 1 && newCount <= 4) {
+                            
+                            // 🌟 升級邏輯：正取追加人數，若導致總數超過上限，警示並轉為備取
+                            if (p.status === '正取' && newCount > p.count) {
+                              const extraNeeded = newCount - p.count;
+                              const currentRemaining = currentMax - confirmedTotal;
+
+                              if (extraNeeded > currentRemaining) {
+                                const confirmChange = window.confirm(
+                                  `⚠️ 【正取轉備取警示】\n\n` +
+                                  `您目前為正取 (${p.count}位)。\n` +
+                                  `由於目前正取名額剩餘 ${currentRemaining < 0 ? 0 : currentRemaining} 位，若您將人數追加至 ${newCount} 位，您的報名將會【整體轉為備取】順序，並將原本的正取名額釋放給後方球友遞補。\n\n` +
+                                  `請問確定要追加人數並轉為備取嗎？`
+                                );
+
+                                if (!confirmChange) {
+                                  return; // 球友取消修改，維持原樣
+                                }
+
+                                // 球友同意轉備取：重新刪除並新增，使其 ID 變成最新（排到最後一位備取）
+                                await supabase.from('tournament_participants').delete().eq('id', p.id);
+                                await supabase.from('tournament_participants').insert([{
+                                  name: p.name,
+                                  category: p.category,
+                                  day_key: p.day_key,
+                                  edit_code: p.edit_code,
+                                  count: newCount
+                                }]);
+                                fetchParticipants();
+                                return;
+                              }
+                            }
+
+                            // 正常修改人數 (減少人數，或正取名額還夠追加)
                             await supabase.from('tournament_participants').update({ count: newCount }).eq('id', p.id);
                             fetchParticipants();
                           }
