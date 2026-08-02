@@ -68,6 +68,9 @@ export default function QiXianPickleball() {
   const [selectedDay, setSelectedDay] = useState(dayOptions[0]);
   const [isCancelled, setIsCancelled] = useState<boolean>(false);
 
+  // 🎯 新增：動態記錄後台設定的人數上限 (連動 0 人設定)
+  const [dynamicMax, setDynamicMax] = useState<number | null>(null);
+
   const isTargetInNextCycle = () => {
     const today = new Date(now);
     today.setHours(0,0,0,0);
@@ -79,12 +82,16 @@ export default function QiXianPickleball() {
   const isExpired = now.getTime() > selectedDay.dateObj.getTime() + (18.5 * 60 * 60 * 1000);
   const isAfter1900 = now.getTime() > selectedDay.dateObj.getTime() + (19 * 60 * 60 * 1000);
   
+  // 🎯 修正：連動後台設定的動態人數與 0 人不開放邏輯
   const getCategories = (dayType: string) => {
-    if (dayType === 'mon_special') return [{ id: 'sanda', label: '散打區', subLabel: 'OPEN PLAY', max: 18, isClosed: false }];
-    if (dayType === 'thu_special') return [{ id: 'sanda', label: '散打區', subLabel: 'OPEN PLAY', max: 28, isClosed: false }];
-    if (dayType === 'fri_special') return [{ id: 'sanda', label: '散打區', subLabel: 'OPEN PLAY', max: 18, isClosed: false }];
-    if (dayType === 'sat_special') return [{ id: 'sanda', label: '散打區', subLabel: 'OPEN PLAY', max: 8, isClosed: false }];
-    return [{ id: 'sanda', label: '散打區', subLabel: 'OPEN PLAY', max: 18, isClosed: false }];
+    let defaultMax = 18;
+    if (dayType === 'thu_special') defaultMax = 28;
+    if (dayType === 'sat_special') defaultMax = 8;
+
+    const finalMax = dynamicMax !== null ? dynamicMax : defaultMax;
+    const isClosed = finalMax === 0;
+
+    return [{ id: 'sanda', label: '散打區', subLabel: 'OPEN PLAY', max: finalMax, isClosed }];
   };
 
   const categories = getCategories(selectedDay.type);
@@ -95,10 +102,10 @@ export default function QiXianPickleball() {
   useEffect(() => {
     const currentCategories = getCategories(selectedDay.type);
     const validLabels = currentCategories.filter(c => !c.isClosed).map(c => c.label);
-    if (!validLabels.includes(activeTab)) {
+    if (validLabels.length > 0 && !validLabels.includes(activeTab)) {
       setActiveTab(validLabels[0]);
     }
-  }, [selectedDay]);
+  }, [selectedDay, dynamicMax]);
 
   useEffect(() => {
     document.title = "七賢國小匹克交流團報名系統";
@@ -111,16 +118,20 @@ export default function QiXianPickleball() {
     if (!error && data) setParticipants(data);
   };
 
+  // 🎯 修正：即時讀取後台 event_settings 表格的 open_play_max
   const fetchEventStatus = async () => {
-    const { data } = await supabase.from('event_status').select('is_cancelled').eq('day_key', selectedDay.key).single();
-    if (data) {
-      setIsCancelled(data.is_cancelled);
+    const { data: statusData } = await supabase.from('event_status').select('is_cancelled').eq('day_key', selectedDay.key).single();
+    setIsCancelled(statusData ? statusData.is_cancelled : false);
+
+    const { data: settingData } = await supabase.from('event_settings').select('open_play_max').eq('day_key', selectedDay.key).single();
+    if (settingData && settingData.open_play_max !== undefined && settingData.open_play_max !== null) {
+      setDynamicMax(settingData.open_play_max);
     } else {
-      setIsCancelled(false);
+      setDynamicMax(null);
     }
   };
 
-  // 🌟 管理員密碼已更新為 8888
+  // 管理員密碼 8888
   const handleToggleRainCancellation = async () => {
     const adminPassword = window.prompt("請輸入提姆大叔管理員密碼：");
     if (adminPassword !== '8888') {
@@ -150,6 +161,7 @@ export default function QiXianPickleball() {
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isCancelled) { alert("本場次因雨取消，暫停報名！"); return; }
+    if (currentMax === 0) { alert("本場次不開放報名！"); return; } // 🎯 0 人阻擋
     if (!isRegistrationOpen) { alert("該場次尚未開放報名！請等候週六 22:00 開放。"); return; }
     if (isExpired) { alert("該場次已截止報名！(每日 18:30 截止)"); return; }
     
@@ -200,7 +212,8 @@ export default function QiXianPickleball() {
   };
 
   const currentGroup = participants.filter(p => p.day_key === selectedDay.key && p.category === activeTab);
-  const currentMax = categories.find(c => c.label === activeTab)?.max || 18;
+  const currentMax = categories.find(c => c.label === activeTab)?.max ?? 18;
+  const isCurrentClosed = categories.find(c => c.label === activeTab)?.isClosed || false;
   
   let runningTotal = 0;
   let hasMetWaitlist = false; 
@@ -262,7 +275,7 @@ export default function QiXianPickleball() {
             <button key={cat.id} onClick={() => { if (!cat.isClosed) setActiveTab(cat.label); }} className={`flex-1 py-8 px-4 rounded-[2rem] transition-all border-4 flex flex-col items-center justify-center ${activeTab === cat.label ? 'bg-slate-800 border-emerald-500 text-emerald-400 shadow-xl' : cat.isClosed ? 'bg-slate-900 border-slate-800/50 text-slate-600 cursor-not-allowed' : 'bg-slate-900 border-slate-800 text-slate-700 hover:bg-slate-800'}`}>
               <span className="text-4xl font-black mb-2">{cat.label}</span>
               <span className={`text-xl font-black ${cat.isClosed ? 'text-red-500/80' : 'opacity-90'}`}>
-                {cat.isClosed ? '這周未開放' : `(${cat.max}人)`}
+                {cat.isClosed ? '這周未開放 (0人)' : `(${cat.max}人)`}
               </span>
             </button>
           ))}
@@ -274,6 +287,11 @@ export default function QiXianPickleball() {
               <div className="bg-slate-800/50 p-10 rounded-[3rem] border border-red-500/30 text-center shadow-inner space-y-2">
                 <p className="text-3xl font-black text-red-400 italic">⛈️ 場次已取消</p>
                 <p className="text-slate-400 font-bold">因雨打不開，大家辛苦了！下週見！</p>
+              </div>
+            ) : isCurrentClosed ? (
+              <div className="bg-slate-800/50 p-10 rounded-[3rem] border border-red-500/30 text-center shadow-inner space-y-2">
+                <p className="text-2xl font-bold text-red-400 italic">⚠️ 本場次未開放</p>
+                <p className="text-slate-400 font-bold">幹部已將本場次人數設為 0 人，暫不開放報名。</p>
               </div>
             ) : !isRegistrationOpen ? (
               <div className="bg-slate-800/50 p-10 rounded-[3rem] border border-slate-700 text-center shadow-inner">
@@ -347,7 +365,7 @@ export default function QiXianPickleball() {
                     </div>
                   </div>
                   <div className="flex gap-2 w-full sm:w-auto">
-                    <button disabled={isAfter1900 || isCancelled} onClick={async () => {
+                    <button disabled={isAfter1900 || isCancelled || isCurrentClosed} onClick={async () => {
                         const code = window.prompt("請輸入密碼：");
                         if (code === p.edit_code) {
                           const newCount = parseInt(window.prompt("新人數 (1-4)：", p.count.toString()) || "");
@@ -379,14 +397,14 @@ export default function QiXianPickleball() {
                             fetchParticipants();
                           }
                         } else if (code) alert("密碼錯誤！");
-                    }} className={`text-xl px-5 py-2 rounded-xl font-black w-24 ${isAfter1900 || isCancelled ? 'bg-slate-800 text-slate-600 cursor-not-allowed' : 'bg-slate-700 text-white hover:bg-slate-600'}`}>修改</button>
-                    <button disabled={isAfter1900 || isCancelled} onClick={async () => {
+                    }} className={`text-xl px-5 py-2 rounded-xl font-black w-24 ${isAfter1900 || isCancelled || isCurrentClosed ? 'bg-slate-800 text-slate-600 cursor-not-allowed' : 'bg-slate-700 text-white hover:bg-slate-600'}`}>修改</button>
+                    <button disabled={isAfter1900 || isCancelled || isCurrentClosed} onClick={async () => {
                         const code = window.prompt("請輸入密碼：");
                         if (code === p.edit_code && window.confirm("確定取消報名？")) {
                           await supabase.from('tournament_participants').delete().eq('id', p.id);
                           fetchParticipants();
                         }
-                    }} className={`text-xl px-5 py-2 rounded-xl font-black border-2 w-24 ${isAfter1900 || isCancelled ? 'border-slate-800 text-slate-600 cursor-not-allowed' : 'border-red-900/50 text-red-500 bg-red-900/30 hover:bg-red-900/50'}`}>取消</button>
+                    }} className={`text-xl px-5 py-2 rounded-xl font-black border-2 w-24 ${isAfter1900 || isCancelled || isCurrentClosed ? 'border-slate-800 text-slate-600 cursor-not-allowed' : 'border-red-900/50 text-red-500 bg-red-900/30 hover:bg-red-900/50'}`}>取消</button>
                   </div>
                 </div>
               ))}
