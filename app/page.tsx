@@ -16,7 +16,8 @@ type Participant = {
   edit_code: string;
   count: number;
   is_present?: boolean;
-  created_at?: string; 
+  created_at?: string;
+  review_status?: string; // 🆕 審核狀態：'approved' | 'pending'
 };
 
 export default function QiXianPickleball() {
@@ -68,6 +69,13 @@ export default function QiXianPickleball() {
   const [selectedDay, setSelectedDay] = useState(dayOptions[0]);
   const [isCancelled, setIsCancelled] = useState<boolean>(false);
 
+  // 🆕 週六早上／晚上場次切換（只有選到週六時才有意義），預設晚上場
+  const [satSession, setSatSession] = useState<'AM' | 'PM'>('PM');
+  const isSaturdaySelected = selectedDay.type === 'sat_special';
+  // 🆕 真正用來查詢/寫入資料庫的 day_key：平日直接用 selectedDay.key；
+  //    週六則依 satSession 決定要不要加上 _AM 後綴（與後台/新手區站台格式一致）
+  const activeDayKey = isSaturdaySelected && satSession === 'AM' ? `${selectedDay.key}_AM` : selectedDay.key;
+
   // 🎯 新增：動態記錄後台設定的人數上限 (連動 0 人設定)
   const [dynamicMax, setDynamicMax] = useState<number | null>(null);
 
@@ -79,8 +87,16 @@ export default function QiXianPickleball() {
 
   const isRegistrationOpen = !(isTargetInNextCycle() && (now.getDay() === 6 && now.getHours() < 22)); 
   
-  const isExpired = now.getTime() > selectedDay.dateObj.getTime() + (18.5 * 60 * 60 * 1000);
-  const isAfter1900 = now.getTime() > selectedDay.dateObj.getTime() + (19 * 60 * 60 * 1000);
+  // 🆕 週六早上場（9-12點）採用提早的截止／鎖定時間：8:30 截止新增、9:00 鎖定修改；
+  //    其餘場次（含週六晚上）維持原本 18:30 截止、19:00 鎖定
+  const isAmSession = isSaturdaySelected && satSession === 'AM';
+  const cutoffHours = isAmSession ? 8.5 : 18.5;
+  const lockHours = isAmSession ? 9 : 19;
+  const cutoffTimeLabel = isAmSession ? '8:30' : '18:30';
+  const lockTimeLabel = isAmSession ? '9:00' : '19:00';
+
+  const isExpired = now.getTime() > selectedDay.dateObj.getTime() + (cutoffHours * 60 * 60 * 1000);
+  const isAfter1900 = now.getTime() > selectedDay.dateObj.getTime() + (lockHours * 60 * 60 * 1000);
   
   // 🎯 修正：連動後台設定的動態人數與 0 人不開放邏輯
   const getCategories = (dayType: string) => {
@@ -111,19 +127,22 @@ export default function QiXianPickleball() {
     document.title = "七賢國小匹克交流團報名系統";
     fetchParticipants();
     fetchEventStatus();
-  }, [selectedDay, activeTab]);
+  }, [selectedDay, activeTab, satSession]);
 
   const fetchParticipants = async () => {
+    // 🆕 抓取全部報名（含待審核 pending），待審核者會顯示在清單中並標示「⏳審核中」，
+    //    但排隊順序、正備取的判定方式維持依報名時間 (id) 先後排隊佔位
     const { data, error } = await supabase.from('tournament_participants').select('*').order('id', { ascending: true });
     if (!error && data) setParticipants(data);
   };
 
   // 🎯 修正：即時讀取後台 event_settings 表格的 open_play_max
+  // 🆕 改用 activeDayKey，才能讓週六早上／晚上場次各自讀到獨立的人數上限設定
   const fetchEventStatus = async () => {
-    const { data: statusData } = await supabase.from('event_status').select('is_cancelled').eq('day_key', selectedDay.key).single();
+    const { data: statusData } = await supabase.from('event_status').select('is_cancelled').eq('day_key', activeDayKey).single();
     setIsCancelled(statusData ? statusData.is_cancelled : false);
 
-    const { data: settingData } = await supabase.from('event_settings').select('open_play_max').eq('day_key', selectedDay.key).single();
+    const { data: settingData } = await supabase.from('event_settings').select('open_play_max').eq('day_key', activeDayKey).single();
     if (settingData && settingData.open_play_max !== undefined && settingData.open_play_max !== null) {
       setDynamicMax(settingData.open_play_max);
     } else {
@@ -142,14 +161,14 @@ export default function QiXianPickleball() {
     const nextStatus = !isCancelled;
     const actionText = nextStatus ? "【因雨取消】" : "【球敘正常】";
 
-    if (window.confirm(`確定要將 ${selectedDay.label} 設定為 ${actionText} 嗎？`)) {
-      await supabase.from('event_status').upsert({ day_key: selectedDay.key, is_cancelled: nextStatus });
+    if (window.confirm(`確定要將 ${selectedDay.label}${isSaturdaySelected ? (satSession === 'AM' ? '早上場' : '晚上場') : ''} 設定為 ${actionText} 嗎？`)) {
+      await supabase.from('event_status').upsert({ day_key: activeDayKey, is_cancelled: nextStatus });
       
       if (nextStatus) {
         await supabase
           .from('tournament_participants')
           .update({ is_present: true })
-          .eq('day_key', selectedDay.key);
+          .eq('day_key', activeDayKey);
       }
 
       setIsCancelled(nextStatus);
@@ -163,13 +182,13 @@ export default function QiXianPickleball() {
     if (isCancelled) { alert("本場次因雨取消，暫停報名！"); return; }
     if (currentMax === 0) { alert("本場次不開放報名！"); return; } // 🎯 0 人阻擋
     if (!isRegistrationOpen) { alert("該場次尚未開放報名！請等候週六 22:00 開放。"); return; }
-    if (isExpired) { alert("該場次已截止報名！(每日 18:30 截止)"); return; }
+    if (isExpired) { alert(`該場次已截止報名！(每日 ${cutoffTimeLabel} 截止)`); return; }
     
     const regCount = parseInt(formData.count);
     const trimmedName = formData.name.trim();
     if (formData.edit_code.length !== 4) { alert("請設定 4 位數密碼"); return; }
     
-    const isDuplicate = participants.some(p => p.day_key === selectedDay.key && p.category === activeTab && p.name.toLowerCase() === trimmedName.toLowerCase());
+    const isDuplicate = participants.some(p => p.day_key === activeDayKey && p.category === activeTab && p.name.toLowerCase() === trimmedName.toLowerCase());
     if (isDuplicate) { alert(`「${trimmedName}」已報名過此場次！`); return; }
 
     const thirtyDaysAgo = new Date();
@@ -195,26 +214,53 @@ export default function QiXianPickleball() {
       }).length;
     }
 
+    // 🆕 查詢此姓名是否已經在「審核通過白名單」中
+    // 有 → 直接視為已審核 (approved)；沒有 → 標記為待審核 (pending)，需管理員審核
+    const { data: approvedRecord, error: approvedCheckError } = await supabase
+      .from('approved_names')
+      .select('id')
+      .eq('name', trimmedName)
+      .maybeSingle();
+
+    if (approvedCheckError) {
+      alert(`系統檢查發生問題：${approvedCheckError.message}`);
+      return;
+    }
+
+    const reviewStatus: 'approved' | 'pending' = approvedRecord ? 'approved' : 'pending';
+
     const { error } = await supabase.from('tournament_participants').insert([{
-      name: trimmedName, category: activeTab, day_key: selectedDay.key, edit_code: formData.edit_code, count: regCount
+      name: trimmedName, category: activeTab, day_key: activeDayKey, edit_code: formData.edit_code, count: regCount,
+      review_status: reviewStatus // 🆕 寫入審核狀態
     }]);
 
     if (!error) {
       setFormData({ name: '', edit_code: '', count: '1' });
       fetchParticipants();
-      
-      if (absentCount > 0) {
-        alert(`🎉 報名成功！\n\n⚠️ 溫馨提醒：\n系統偵測到【${trimmedName}】在過去 30 天內共有 ${absentCount} 次「未到場報到」的紀錄。請球友記得準時出席，或於球聚當天 19:00 前線上取消，以免影響未來報名權限喔！`);
+
+      // 🆕 依審核狀態與缺席提醒組合對應的提示訊息
+      let message = '';
+      if (reviewStatus === 'pending') {
+        message = '✅ 報名已送出！\n\n這是您第一次報名，需要管理員審核通過後才會確認正取/備取資格。審核通過後，您之後在本站或新手區網站報名都不需要再審核。';
       } else {
-        alert("🎉 報名成功！期待您的參與！");
+        message = '🎉 報名成功！期待您的參與！';
       }
+
+      if (absentCount > 0) {
+        message += `\n\n⚠️ 溫馨提醒：\n系統偵測到【${trimmedName}】在過去 30 天內共有 ${absentCount} 次「未到場報到」的紀錄。請球友記得準時出席，或於球聚當天 19:00 前線上取消，以免影響未來報名權限喔！`;
+      }
+
+      alert(message);
     }
   };
 
-  const currentGroup = participants.filter(p => p.day_key === selectedDay.key && p.category === activeTab);
+  const currentGroup = participants.filter(p => p.day_key === activeDayKey && p.category === activeTab);
   const currentMax = categories.find(c => c.label === activeTab)?.max ?? 18;
   const isCurrentClosed = categories.find(c => c.label === activeTab)?.isClosed || false;
   
+  // 🆕 pending（審核中）與 approved（已審核）依「報名先後順序（id）」一起排隊佔用名額，
+  //    這樣才符合「先報先贏」的邏輯：審核中的人依然照順位卡住位子。
+  //    若該筆審核中的報名之後被管理員拒絕（會被刪除），名額會自動讓給後面備取的人遞補。
   let runningTotal = 0;
   let hasMetWaitlist = false; 
   const listWithStatus = currentGroup.map(p => {
@@ -247,7 +293,7 @@ export default function QiXianPickleball() {
               <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-full px-8 py-3 inline-block shadow-lg">
                 <div className="text-lg font-bold text-emerald-400 flex flex-wrap justify-center gap-x-8 gap-y-2">
                   <span>🟢 今日球敘正常進行</span>
-                  <span>🕒 19:00 - 21:20</span>
+                  <span>🕒 {isAmSession ? '9:00 - 12:00' : '19:00 - 21:20'}</span>
                   <span>💰 $100 / 人</span>
                 </div>
               </div>
@@ -259,7 +305,11 @@ export default function QiXianPickleball() {
               📢 每週六晚上 22:00 開放下一週報名
             </span>
             <span className="bg-red-500/10 text-red-400 border border-red-500/30 px-5 py-1 rounded-full text-sm font-bold">
-              ⚠️ 各場次於當天 18:30 截止新增報名，19:00 後關閉修改/取消
+              ⚠️ 本場次於當天 {cutoffTimeLabel} 截止新增報名，{lockTimeLabel} 後關閉修改/取消
+            </span>
+            {/* 🆕 首次報名審核提醒 */}
+            <span className="bg-amber-500/10 text-amber-400 border border-amber-500/30 px-5 py-1 rounded-full text-sm font-bold">
+              ℹ️ 首次報名需管理員審核，審核通過後之後報名（含新手區網站）即可直接排入正備取
             </span>
           </div>
 
@@ -268,6 +318,32 @@ export default function QiXianPickleball() {
               <button key={d.key} onClick={() => setSelectedDay(d)} className={`px-6 py-4 rounded-2xl font-black text-xl transition-all ${selectedDay.key === d.key ? 'bg-emerald-500 text-white shadow-xl scale-105' : 'bg-slate-800 text-slate-500 hover:bg-slate-700'}`}>{d.label}</button>
             ))}
           </div>
+
+          {/* 🆕 週六早上／晚上次選單：只有選到週六時才會顯示 */}
+          {isSaturdaySelected && (
+            <div className="flex justify-center gap-3 mt-4">
+              <button
+                onClick={() => setSatSession('AM')}
+                className={`px-6 py-3 rounded-2xl font-black text-lg transition-all flex items-center gap-2 ${
+                  satSession === 'AM'
+                    ? 'bg-amber-400 text-slate-900 shadow-xl scale-105'
+                    : 'bg-slate-800 text-slate-500 border-2 border-slate-700 hover:bg-slate-700'
+                }`}
+              >
+                🌅 早上場 (9-12點)
+              </button>
+              <button
+                onClick={() => setSatSession('PM')}
+                className={`px-6 py-3 rounded-2xl font-black text-lg transition-all flex items-center gap-2 ${
+                  satSession === 'PM'
+                    ? 'bg-emerald-500 text-white shadow-xl scale-105'
+                    : 'bg-slate-800 text-slate-500 border-2 border-slate-700 hover:bg-slate-700'
+                }`}
+              >
+                🌙 晚上場
+              </button>
+            </div>
+          )}
         </header>
 
         <div className="flex gap-4 mb-10">
@@ -301,12 +377,12 @@ export default function QiXianPickleball() {
             ) : isAfter1900 ? (
               <div className="bg-slate-800/50 p-10 rounded-[3rem] border border-slate-700 text-center shadow-inner">
                 <p className="text-2xl font-bold text-slate-500 italic text-white uppercase">活動已開打 / 結束</p>
-                <p className="text-slate-500 mt-2 italic text-sm">晚上 19:00 後已關閉所有更動</p>
+                <p className="text-slate-500 mt-2 italic text-sm">{lockTimeLabel} 後已關閉所有更動</p>
               </div>
             ) : isExpired ? (
               <div className="bg-slate-800/50 p-10 rounded-[3rem] border border-slate-700 text-center shadow-inner">
                 <p className="text-2xl font-bold text-red-400 italic text-white uppercase">已截止報名</p>
-                <p className="text-slate-500 mt-2 italic text-sm">18:30 後僅限代表密碼修改/取消</p>
+                <p className="text-slate-500 mt-2 italic text-sm">{cutoffTimeLabel} 後僅限代表密碼修改/取消</p>
               </div>
             ) : (
               <form onSubmit={handleRegister} className="bg-slate-800 p-10 rounded-[3rem] space-y-6 border border-slate-700 shadow-2xl relative overflow-hidden">
@@ -353,11 +429,23 @@ export default function QiXianPickleball() {
               </div>
             </div>
             <div className="space-y-4">
-              {listWithStatus.map((p) => (
-                <div key={p.id} className="bg-slate-800/60 p-5 rounded-[2rem] flex flex-col sm:flex-row justify-between items-center border-2 border-slate-800 hover:border-emerald-500/50 transition-all gap-4 shadow-xl">
+              {listWithStatus.map((p) => {
+                // 🆕 待審核的人顯示「⏳審核中」標籤，取代原本的正取/備取/已到場顯示
+                const isPending = p.review_status === 'pending';
+                const badgeText = isPending ? '⏳審核中' : (p.is_present ? '已到場' : p.status);
+                const badgeColorClass = isPending
+                  ? 'bg-amber-500 text-slate-900 shadow-lg'
+                  : p.is_present
+                  ? 'bg-blue-600 text-white shadow-md'
+                  : p.status === '備取'
+                  ? 'bg-orange-500 text-white shadow-lg'
+                  : 'bg-emerald-500 text-white shadow-lg';
+
+                return (
+                <div key={p.id} className={`bg-slate-800/60 p-5 rounded-[2rem] flex flex-col sm:flex-row justify-between items-center border-2 transition-all gap-4 shadow-xl ${isPending ? 'border-amber-500/40 border-dashed' : 'border-slate-800 hover:border-emerald-500/50'}`}>
                   <div className="flex items-center gap-6 w-full sm:w-auto">
-                    <span className={`text-xl font-black px-5 py-2 rounded-xl shrink-0 w-24 text-center ${p.is_present ? 'bg-blue-600 text-white shadow-md' : p.status === '備取' ? 'bg-orange-500 text-white shadow-lg' : 'bg-emerald-500 text-white shadow-lg'}`}>
-                      {p.is_present ? '已到場' : p.status}
+                    <span className={`text-xl font-black px-5 py-2 rounded-xl shrink-0 w-24 text-center ${badgeColorClass}`}>
+                      {badgeText}
                     </span>
                     <div className="flex items-baseline gap-4">
                       <span className={`font-black text-4xl tracking-tight ${p.is_present ? 'text-slate-400 line-through' : 'text-white'}`}>{p.name}</span>
@@ -386,7 +474,7 @@ export default function QiXianPickleball() {
 
                                 await supabase.from('tournament_participants').delete().eq('id', p.id);
                                 await supabase.from('tournament_participants').insert([{
-                                  name: p.name, category: p.category, day_key: p.day_key, edit_code: p.edit_code, count: newCount
+                                  name: p.name, category: p.category, day_key: p.day_key, edit_code: p.edit_code, count: newCount, review_status: p.review_status || 'approved'
                                 }]);
                                 fetchParticipants();
                                 return;
@@ -407,7 +495,8 @@ export default function QiXianPickleball() {
                     }} className={`text-xl px-5 py-2 rounded-xl font-black border-2 w-24 ${isAfter1900 || isCancelled || isCurrentClosed ? 'border-slate-800 text-slate-600 cursor-not-allowed' : 'border-red-900/50 text-red-500 bg-red-900/30 hover:bg-red-900/50'}`}>取消</button>
                   </div>
                 </div>
-              ))}
+                );
+              })}
               {listWithStatus.length === 0 && <div className="text-center py-24 text-slate-700 font-black text-3xl italic">目前尚無人報名</div>}
             </div>
           </div>
