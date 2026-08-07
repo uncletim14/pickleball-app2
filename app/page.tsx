@@ -114,6 +114,8 @@ export default function QiXianPickleball() {
   const [activeTab, setActiveTab] = useState(categories[0].label);
   const [formData, setFormData] = useState({ name: '', edit_code: '', count: '1' });
   const [participants, setParticipants] = useState<Participant[]>([]);
+  // 🆕 黑名單清單（本站原本完全沒有黑名單檢查，這裡補上，讓自動停權真正生效）
+  const [blacklists, setBlacklists] = useState<{ id: number; name: string; blocked_until: string }[]>([]);
 
   useEffect(() => {
     const currentCategories = getCategories(selectedDay.type);
@@ -127,6 +129,7 @@ export default function QiXianPickleball() {
     document.title = "七賢國小匹克交流團報名系統";
     fetchParticipants();
     fetchEventStatus();
+    fetchBlacklists(); // 🆕
   }, [selectedDay, activeTab, satSession]);
 
   const fetchParticipants = async () => {
@@ -148,6 +151,12 @@ export default function QiXianPickleball() {
     } else {
       setDynamicMax(null);
     }
+  };
+
+  // 🆕 抓取黑名單清單
+  const fetchBlacklists = async () => {
+    const { data } = await supabase.from('blacklists').select('*');
+    if (data) setBlacklists(data);
   };
 
   // 管理員密碼 8888
@@ -191,6 +200,13 @@ export default function QiXianPickleball() {
     const isDuplicate = participants.some(p => p.day_key === activeDayKey && p.category === activeTab && p.name.toLowerCase() === trimmedName.toLowerCase());
     if (isDuplicate) { alert(`「${trimmedName}」已報名過此場次！`); return; }
 
+    // 🆕 黑名單檢查（本站原本沒有這道檢查，這裡補上）
+    const isBlocked = blacklists.some(b => b.name.trim() === trimmedName);
+    if (isBlocked) {
+      alert('⚠️ 您的帳號目前處於停權狀態，無法進行報名！如有疑問請洽幹部。');
+      return;
+    }
+
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     const featureLaunchDate = new Date('2026-07-13T00:00:00');
@@ -208,10 +224,33 @@ export default function QiXianPickleball() {
     if (!historyError && historyData) {
       const rightNow = new Date();
       absentCount = historyData.filter(p => {
-        const matchDate = new Date(p.day_key);
+        // 🆕 day_key 可能帶有時段後綴（如 2026-8-8_AM），解析日期前先去除後綴避免 Invalid Date
+        const datePart = p.day_key.split('_')[0];
+        const matchDate = new Date(datePart);
         matchDate.setHours(19, 0, 0, 0);
         return rightNow.getTime() > matchDate.getTime();
       }).length;
+    }
+
+    // 🆕 累積 2 次（含）以上未到場 → 自動停權 30 天（僅本站，不同步新手區），並直接擋下這次報名
+    const ABSENT_AUTO_BLOCK_THRESHOLD = 2;
+    if (absentCount >= ABSENT_AUTO_BLOCK_THRESHOLD) {
+      const targetDate = new Date();
+      targetDate.setDate(targetDate.getDate() + 30);
+      const blockedUntilStr = targetDate.toISOString().split('T')[0];
+
+      const { error: autoBlockError } = await supabase
+        .from('blacklists')
+        .insert([{ name: trimmedName, blocked_until: blockedUntilStr }]);
+
+      if (autoBlockError) {
+        alert(`系統偵測到異常未到場次數，但停權寫入失敗：${autoBlockError.message}，請洽幹部處理。`);
+        return;
+      }
+
+      alert(`⚠️ 系統偵測到【${trimmedName}】在過去 30 天內已累積 ${absentCount} 次「未到場」紀錄，已自動停權 30 天（至 ${blockedUntilStr} 止），本次報名無法送出。如有疑問請洽幹部。`);
+      fetchBlacklists(); // 讓黑名單狀態即時反映
+      return;
     }
 
     // 🆕 查詢此姓名是否已經在「審核通過白名單」中
