@@ -30,25 +30,31 @@ export default function CheckInPage() {
 
   const todayKey = getTodayKey();
 
-  // 檢查目前時間是否在 18:30 ~ 21:00 之間
-  const isTimeValid = () => {
-    const now = new Date();
-    const currentHour = now.getHours() + now.getMinutes() / 60;
-    // 🌟 調整：18.5 代表 18:30，21 代表 21:00 準時關門
-    return currentHour >= 18.5 && currentHour <= 21;
-  };
+  // 🆕 判斷目前是否為週六早上場的報到時間窗（8:30-12:00），
+  //    以及原本的晚上場報到時間窗（18:30-21:00）
+  const now = new Date();
+  const isSaturdayToday = now.getDay() === 6;
+  const currentHour = now.getHours() + now.getMinutes() / 60;
+
+  const isMorningWindow = isSaturdayToday && currentHour >= 8.5 && currentHour <= 12;
+  const isEveningWindow = currentHour >= 18.5 && currentHour <= 21;
+  const isTimeValid = isMorningWindow || isEveningWindow;
+
+  // 🆕 依報到時段決定要查詢哪個 day_key：早上場帶 _AM 後綴，晚上場（含平日）維持原樣
+  const activeDayKey = isMorningWindow ? `${todayKey}_AM` : todayKey;
 
   useEffect(() => {
     fetchTodayParticipants();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchTodayParticipants = async () => {
     setLoading(true);
-    // 撈出今天這場活動、而且還沒有報到過 (is_present != true) 的人
+    // 撈出「當下時段對應場次」（早上場或晚上場）、而且還沒有報到過 (is_present != true) 的人
     const { data, error } = await supabase
       .from('tournament_participants')
       .select('*')
-      .eq('day_key', todayKey)
+      .eq('day_key', activeDayKey)
       .or('is_present.eq.false,is_present.is.null')
       .order('id', { ascending: true });
 
@@ -62,8 +68,8 @@ export default function CheckInPage() {
     e.preventDefault();
     setMessage(null);
 
-    if (!isTimeValid()) {
-      setMessage({ text: '❌ 未到報到時間或已過報到時間！(開放時間：18:30 ~ 21:00)', isSuccess: false });
+    if (!isTimeValid) {
+      setMessage({ text: '❌ 未到報到時間或已過報到時間！(開放時間：8:30~12:00 或 18:30~21:00)', isSuccess: false });
       return;
     }
 
@@ -106,8 +112,9 @@ export default function CheckInPage() {
         <div className="text-center space-y-2">
           <h1 className="text-3xl font-black text-emerald-400 italic tracking-wider">七賢匹克球團</h1>
           <p className="text-slate-400 font-bold text-lg">📱 現場自主到場報到系統</p>
+          {/* 🆕 依是否為週六早上場，顯示對應的開放時間文字 */}
           <p className="text-slate-500 text-xs bg-slate-900/50 py-1 rounded-full inline-block px-4 border border-slate-700">
-            ⏰ 今日開放時間：18:30 - 21:00
+            ⏰ 今日開放時間：{isSaturdayToday ? '8:30 - 12:00（早上場）或 18:30 - 21:00（晚上場）' : '18:30 - 21:00'}
           </p>
         </div>
 
@@ -121,10 +128,14 @@ export default function CheckInPage() {
           </div>
         )}
 
-        {!isTimeValid() ? (
+        {!isTimeValid ? (
           <div className="bg-slate-900/50 p-8 rounded-2xl border border-slate-700 text-center space-y-2">
             <p className="text-xl font-bold text-slate-400">🔒 目前非現場報到時段</p>
-            <p className="text-slate-500 text-sm">請於球聚當天 18:30 ~ 21:00 之間到場掃碼報到</p>
+            <p className="text-slate-500 text-sm">
+              {isSaturdayToday
+                ? '請於球聚當天 8:30~12:00（早上場）或 18:30~21:00（晚上場）之間到場掃碼報到'
+                : '請於球聚當天 18:30 ~ 21:00 之間到場掃碼報到'}
+            </p>
           </div>
         ) : loading ? (
           <div className="text-center text-slate-400 font-bold py-6 animate-pulse">撈取今日名單中...</div>
