@@ -262,26 +262,8 @@ export default function QiXianPickleball() {
       }).length;
     }
 
-    // 🆕 累積 2 次（含）以上未到場 → 自動停權 30 天（僅本站，不同步新手區），並直接擋下這次報名
-    const ABSENT_AUTO_BLOCK_THRESHOLD = 2;
-    if (absentCount >= ABSENT_AUTO_BLOCK_THRESHOLD) {
-      const targetDate = new Date();
-      targetDate.setDate(targetDate.getDate() + 30);
-      const blockedUntilStr = targetDate.toISOString().split('T')[0];
-
-      const { error: autoBlockError } = await supabase
-        .from('blacklists')
-        .insert([{ name: trimmedName, blocked_until: blockedUntilStr }]);
-
-      if (autoBlockError) {
-        alert(`系統偵測到異常未到場次數，但停權寫入失敗：${autoBlockError.message}，請洽幹部處理。`);
-        return;
-      }
-
-      alert(`⚠️ 系統偵測到【${trimmedName}】在過去 30 天內已累積 ${absentCount} 次「未到場」紀錄，已自動停權 30 天（至 ${blockedUntilStr} 止），本次報名無法送出。如有疑問請洽幹部。`);
-      fetchBlacklists(); // 讓黑名單狀態即時反映
-      return;
-    }
+    // 🆕 累積次數僅供提醒與後台顯示，不再由系統自動停權；
+    //    是否停權改由幹部在後台「缺席名單」畫面人工判斷、手動點擊執行
 
     // 🆕 查詢此姓名是否已經在「審核通過白名單」中
     // 有 → 直接視為已審核 (approved)；沒有 → 標記為待審核 (pending)，需管理員審核
@@ -315,7 +297,9 @@ export default function QiXianPickleball() {
         message = '🎉 報名成功！期待您的參與！';
       }
 
-      if (absentCount > 0) {
+      if (absentCount >= 2) {
+        message += `\n\n🚨 重要提醒：\n系統偵測到【${trimmedName}】在過去 30 天內已累積 ${absentCount} 次「未到場報到」的紀錄，已達幹部關注門檻，可能會被人工停權處理。請務必準時出席，或於球聚當天 19:00 前線上取消，以免影響未來報名權限！`;
+      } else if (absentCount > 0) {
         message += `\n\n⚠️ 溫馨提醒：\n系統偵測到【${trimmedName}】在過去 30 天內共有 ${absentCount} 次「未到場報到」的紀錄。請球友記得準時出席，或於球聚當天 19:00 前線上取消，以免影響未來報名權限喔！`;
       }
 
