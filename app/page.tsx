@@ -210,7 +210,37 @@ export default function QiXianPickleball() {
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     const featureLaunchDate = new Date('2026-07-13T00:00:00');
-    const startDate = thirtyDaysAgo > featureLaunchDate ? thirtyDaysAgo : featureLaunchDate;
+    let startDate = thirtyDaysAgo > featureLaunchDate ? thirtyDaysAgo : featureLaunchDate;
+
+    // 🆕 若幹部曾按下「一鍵重置全部未到場紀錄」，所有人的起算時間都會往後移到重置時間點
+    const { data: globalResetRecord } = await supabase
+      .from('absence_global_reset')
+      .select('reset_at')
+      .eq('id', 1)
+      .maybeSingle();
+
+    if (globalResetRecord?.reset_at) {
+      const globalResetAt = new Date(globalResetRecord.reset_at);
+      if (globalResetAt > startDate) {
+        startDate = globalResetAt;
+      }
+    }
+
+    // 🆕 若幹部曾在後台解除過此人的停權，只計算「豁免時間之後」發生的未到場紀錄，
+    //    避免已經被解除的舊紀錄馬上又觸發一次自動停權
+    const { data: overrideRecord } = await supabase
+      .from('absence_overrides')
+      .select('overridden_at')
+      .eq('name', trimmedName)
+      .maybeSingle();
+
+    if (overrideRecord?.overridden_at) {
+      const overriddenAt = new Date(overrideRecord.overridden_at);
+      if (overriddenAt > startDate) {
+        startDate = overriddenAt;
+      }
+    }
+
     const isoStartDate = startDate.toISOString();
 
     const { data: historyData, error: historyError } = await supabase
