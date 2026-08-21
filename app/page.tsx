@@ -172,13 +172,11 @@ export default function QiXianPickleball() {
 
     if (window.confirm(`確定要將 ${selectedDay.label}${isSaturdaySelected ? (satSession === 'AM' ? '早上場' : '晚上場') : ''} 設定為 ${actionText} 嗎？`)) {
       await supabase.from('event_status').upsert({ day_key: activeDayKey, is_cancelled: nextStatus });
-      
-      if (nextStatus) {
-        await supabase
-          .from('tournament_participants')
-          .update({ is_present: true })
-          .eq('day_key', activeDayKey);
-      }
+
+      // 🆕 移除「因雨取消時把 is_present 全部改成 true」的舊邏輯——
+      //    is_present 同時也是後台計算「已收費/已到場」收入的依據，
+      //    竄改它會導致因雨取消的場次被後台誤算成有收入。
+      //    未到場次數統計改用 event_status 判斷是否因雨取消來排除，不再依賴 is_present。
 
       setIsCancelled(nextStatus);
       fetchParticipants();
@@ -250,10 +248,18 @@ export default function QiXianPickleball() {
       .eq('is_present', false) 
       .gte('created_at', isoStartDate); 
 
+    // 🆕 查詢因雨取消的場次清單，未到場次數統計時要排除這些天（不是本人的錯，不該算未到場）
+    const { data: cancelledDays } = await supabase
+      .from('event_status')
+      .select('day_key')
+      .eq('is_cancelled', true);
+    const cancelledDayKeySet = new Set((cancelledDays || []).map((c: any) => c.day_key));
+
     let absentCount = 0;
     if (!historyError && historyData) {
       const rightNow = new Date();
       absentCount = historyData.filter(p => {
+        if (cancelledDayKeySet.has(p.day_key)) return false; // 🆕 因雨取消的場次不算未到場
         // 🆕 day_key 可能帶有時段後綴（如 2026-8-8_AM），解析日期前先去除後綴避免 Invalid Date
         const datePart = p.day_key.split('_')[0];
         const matchDate = new Date(datePart);
