@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import Image from 'next/image';
 
@@ -76,6 +76,11 @@ export default function QiXianPickleball() {
   //    週六則依 satSession 決定要不要加上 _AM 後綴（與後台/新手區站台格式一致）
   const activeDayKey = isSaturdaySelected && satSession === 'AM' ? `${selectedDay.key}_AM` : selectedDay.key;
 
+  // 🆕 隨時保存「目前畫面上選擇的場次」，讓非同步的資料庫查詢回來時可以比對，
+  //    避免使用者切換場次太快，導致舊場次的回應蓋掉新場次的資料
+  const activeDayKeyRef = useRef(activeDayKey);
+  activeDayKeyRef.current = activeDayKey;
+
   // 🎯 新增：動態記錄後台設定的人數上限 (連動 0 人設定)
   const [dynamicMax, setDynamicMax] = useState<number | null>(null);
 
@@ -127,6 +132,9 @@ export default function QiXianPickleball() {
 
   useEffect(() => {
     document.title = "七賢國小匹克交流團報名系統";
+    // 🎯 修正：切換日期/場次的當下，先把上一個場次殘留的人數上限清空，
+    //    避免畫面在新資料抓回來之前，短暫顯示「上一個場次」的錯誤人數
+    setDynamicMax(null);
     fetchParticipants();
     fetchEventStatus();
     fetchBlacklists(); // 🆕
@@ -142,10 +150,17 @@ export default function QiXianPickleball() {
   // 🎯 修正：即時讀取後台 event_settings 表格的 open_play_max
   // 🆕 改用 activeDayKey，才能讓週六早上／晚上場次各自讀到獨立的人數上限設定
   const fetchEventStatus = async () => {
-    const { data: statusData } = await supabase.from('event_status').select('is_cancelled').eq('day_key', activeDayKey).single();
+    // 🆕 記下這次請求對應的場次，等資料回來時比對是否仍是「目前選擇的場次」，
+    //    如果使用者在等待期間已經切到別的日期，就捨棄這筆過期的回應，避免資料錯位
+    const requestedKey = activeDayKey;
+
+    const { data: statusData } = await supabase.from('event_status').select('is_cancelled').eq('day_key', requestedKey).single();
+    const { data: settingData } = await supabase.from('event_settings').select('open_play_max').eq('day_key', requestedKey).single();
+
+    if (requestedKey !== activeDayKeyRef.current) return; // 場次已經被切換，這筆回應過期了，不套用
+
     setIsCancelled(statusData ? statusData.is_cancelled : false);
 
-    const { data: settingData } = await supabase.from('event_settings').select('open_play_max').eq('day_key', activeDayKey).single();
     if (settingData && settingData.open_play_max !== undefined && settingData.open_play_max !== null) {
       setDynamicMax(settingData.open_play_max);
     } else {
@@ -199,7 +214,13 @@ export default function QiXianPickleball() {
     if (isDuplicate) { alert(`「${trimmedName}」已報名過此場次！`); return; }
 
     // 🆕 黑名單檢查（本站原本沒有這道檢查，這裡補上）
-    const isBlocked = blacklists.some(b => b.name.trim() === trimmedName);
+    // 🎯 修正：需比對 blocked_until 停權到期時間，過期的停權紀錄不應再擋下報名；
+    //    blocked_until 若沒有填寫（null/空字串）則視為無期限停權，繼續擋下
+    const isBlocked = blacklists.some(b => {
+      if (b.name.trim() !== trimmedName) return false;
+      if (!b.blocked_until) return true;
+      return new Date(b.blocked_until).getTime() > now.getTime();
+    });
     if (isBlocked) {
       alert('⚠️ 您的帳號目前處於停權狀態，無法進行報名！如有疑問請洽幹部。');
       return;
