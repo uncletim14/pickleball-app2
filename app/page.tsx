@@ -105,8 +105,8 @@ export default function QiXianPickleball() {
   
   // 🎯 修正：連動後台設定的動態人數與 0 人不開放邏輯
   const getCategories = (dayType: string) => {
+    // 🆕 週一/週四/週五永久預設改為 18 人（原本週四是 28 人，已依需求統一調整）
     let defaultMax = 18;
-    if (dayType === 'thu_special') defaultMax = 28;
     if (dayType === 'sat_special') defaultMax = 8;
 
     const finalMax = dynamicMax !== null ? dynamicMax : defaultMax;
